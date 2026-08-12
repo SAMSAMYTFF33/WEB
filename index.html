@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>TapEarn — اربح من مشاهدة الإعلانات</title>
+
+<!-- Telegram WebApp SDK -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<!-- AdsGram SDK — راجع https://docs.adsgram.ai قبل النشر -->
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0b131c;
+    --surface:#131f2b;
+    --surface-2:#1b2a38;
+    --border:rgba(255,255,255,.06);
+    --text:#e9eef4;
+    --text-muted:#8695a6;
+    --tg-blue:#2aabee;
+    --tg-blue-2:#229ed9;
+    --ton-blue:#0098ea;
+    --gold:#f6b73c;
+    --gold-2:#ffd77a;
+    --danger:#ef5b5b;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+
+  html,body{
+    height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Tajawal', -apple-system, system-ui, sans-serif;
+    overscroll-behavior:none;
+  }
+
+  body{
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar{ display:none; }
+
+  /* ===== Header ===== */
+  header{
+    padding: calc(14px + var(--safe-top)) 16px 14px;
+    background: linear-gradient(180deg, #0e1a26 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top:0; z-index:10;
+  }
+  .header-row{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+  }
+  .brand{ display:flex; align-items:center; gap:8px; }
+  .brand-dot{
+    width:10px; height:10px; border-radius:50%;
+    background: radial-gradient(circle at 30% 30%, var(--gold-2), var(--gold));
+    box-shadow: 0 0 10px rgba(246,183,60,.6);
+  }
+  .brand span{ font-weight:800; font-size:15px; letter-spacing:.2px; }
+  .avatar{
+    width:34px; height:34px; border-radius:50%;
+    background: linear-gradient(135deg, var(--tg-blue), var(--tg-blue-2));
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:13px;
+  }
+
+  .balance-card{
+    background: linear-gradient(135deg, var(--surface-2), var(--surface));
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:16px 18px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .balance-label{ font-size:12px; color:var(--text-muted); margin-bottom:6px; }
+  .balance-value{ font-size:26px; font-weight:900; display:flex; align-items:baseline; gap:6px; }
+  .balance-value .unit{ font-size:13px; color:var(--gold); font-weight:700; }
+  .balance-usd{ font-size:11px; color:var(--text-muted); margin-top:4px; }
+  .coin-icon{
+    width:46px; height:46px; border-radius:50%;
+    background: conic-gradient(from 200deg, var(--gold), var(--gold-2), var(--gold));
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; box-shadow: 0 0 18px rgba(246,183,60,.35);
+  }
+
+  /* ===== Tabs / views ===== */
+  main{ flex:1; padding: 18px 16px calc(96px + var(--safe-bottom)); }
+  .view{ display:none; animation: fadein .25s ease; }
+  .view.active{ display:block; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .section-title{ font-size:14px; font-weight:800; color:var(--text-muted); margin: 22px 0 10px; }
+  .section-title:first-child{ margin-top:0; }
+
+  /* --- Home: earn orb --- */
+  .orb-wrap{ display:flex; flex-direction:column; align-items:center; padding: 20px 0 6px; }
+  .orb{
+    position:relative; width:190px; height:190px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; user-select:none; border:none; background:none;
+  }
+  .orb-ring{
+    position:absolute; inset:0; border-radius:50%;
+    background: conic-gradient(var(--gold) calc(var(--progress, 0) * 1%), rgba(255,255,255,.07) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px));
+            mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px));
+    transition: background 1s ease;
+  }
+  .orb-core{
+    position:relative; width:150px; height:150px; border-radius:50%;
+    background: radial-gradient(circle at 32% 28%, #24384a, #101c27 70%);
+    border:1px solid rgba(255,255,255,.08);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:4px;
+    box-shadow: inset 0 0 30px rgba(0,0,0,.4);
+    transition: transform .12s ease;
+  }
+  .orb:active .orb-core{ transform: scale(.96); }
+  .orb-core .icon{ font-size:34px; filter: drop-shadow(0 0 8px rgba(246,183,60,.5)); }
+  .orb-core .cta{ font-size:13px; font-weight:800; }
+  .orb-core .sub{ font-size:11px; color:var(--text-muted); }
+
+  .orb-progress-label{ margin-top:14px; font-size:12px; color:var(--text-muted); }
+
+  .burst{
+    position:absolute; inset:0; pointer-events:none;
+  }
+  .spark{
+    position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%;
+    background: var(--gold-2); opacity:0;
+  }
+
+  /* --- generic cards --- */
+  .card{
+    background: var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:12px;
+  }
+  .row{ display:flex; align-items:center; justify-content:space-between; }
+  .row + .row{ margin-top:10px; }
+  .row .k{ font-size:13px; color:var(--text-muted); }
+  .row .v{ font-size:14px; font-weight:700; }
+
+  .btn{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; padding:14px; border-radius:14px; border:none;
+    font-family:inherit; font-size:14px; font-weight:800; cursor:pointer;
+    color:#fff;
+  }
+  .btn-primary{ background: linear-gradient(135deg, var(--tg-blue), var(--tg-blue-2)); }
+  .btn-ton{ background: linear-gradient(135deg, var(--ton-blue), #006fae); }
+  .btn-ghost{ background: var(--surface-2); color:var(--text); border:1px solid var(--border); }
+  .btn[disabled]{ opacity:.45; pointer-events:none; }
+
+  .input{
+    width:100%; padding:13px 14px; border-radius:12px;
+    background: var(--surface-2); border:1px solid var(--border);
+    color:var(--text); font-family:inherit; font-size:14px; margin-bottom:10px;
+  }
+  .input::placeholder{ color:var(--text-muted); }
+
+  .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.7; margin-top:6px; }
+  .hint.warn{ color:#f2c14e; }
+
+  .ref-link{
+    display:flex; align-items:center; gap:8px;
+    background: var(--surface-2); border:1px dashed rgba(255,255,255,.15);
+    border-radius:12px; padding:12px; font-size:12.5px; color:var(--text-muted);
+    direction:ltr; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+
+  .empty{ text-align:center; padding:26px 10px; color:var(--text-muted); font-size:13px; }
+
+  /* --- mining --- */
+  .mining-card{
+    background: linear-gradient(135deg, #1a2c22, var(--surface));
+    border:1px solid rgba(88,199,120,.18);
+  }
+  .rate-pill{
+    display:inline-flex; align-items:center; gap:6px;
+    background: rgba(88,199,120,.12); color:#7fe2a0;
+    padding:4px 10px; border-radius:999px; font-size:11px; font-weight:800;
+  }
+
+  /* ===== Bottom nav ===== */
+  nav{
+    position:fixed; bottom:0; left:0; right:0;
+    background: rgba(11,19,28,.92);
+    backdrop-filter: blur(14px);
+    border-top:1px solid var(--border);
+    padding: 8px 10px calc(8px + var(--safe-bottom));
+    display:flex; gap:4px; z-index:20;
+  }
+  .tab{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:none; border:none; color:var(--text-muted);
+    font-family:inherit; padding:8px 2px; border-radius:12px; cursor:pointer;
+  }
+  .tab svg{ width:22px; height:22px; }
+  .tab span{ font-size:10.5px; font-weight:700; }
+  .tab.active{ color:var(--tg-blue); background: rgba(42,171,238,.08); }
+  .tab.active svg{ filter: drop-shadow(0 0 6px rgba(42,171,238,.5)); }
+
+  .toast{
+    position:fixed; top: calc(12px + var(--safe-top)); left:50%; transform:translateX(-50%) translateY(-140%);
+    background:#1c2a38; border:1px solid var(--border); color:var(--text);
+    padding:10px 16px; border-radius:12px; font-size:13px; font-weight:700;
+    z-index:50; transition: transform .25s ease; box-shadow:0 8px 24px rgba(0,0,0,.35);
+    white-space:nowrap;
+  }
+  .toast.show{ transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="brand"><span class="brand-dot"></span><span>TapEarn</span></div>
+    <div class="avatar" id="avatarInitial">?</div>
+  </div>
+  <div class="balance-card">
+    <div>
+      <div class="balance-label">رصيدك الحالي</div>
+      <div class="balance-value"><span id="balanceValue">0.000</span><span class="unit">TON</span></div>
+      <div class="balance-usd" id="balanceUsd">≈ $0.00</div>
+    </div>
+    <div class="coin-icon">🪙</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===== Home / Watch Ads ===== -->
+  <section class="view active" id="view-home">
+    <div class="orb-wrap">
+      <button class="orb" id="orbBtn">
+        <div class="orb-ring" id="orbRing"></div>
+        <div class="orb-core">
+          <div class="icon">▶</div>
+          <div class="cta">مشاهدة إعلان</div>
+          <div class="sub">+0.002 TON</div>
+        </div>
+        <div class="burst" id="burst"></div>
+      </button>
+      <div class="orb-progress-label" id="progressLabel">0 / 20 مشاهدة اليوم</div>
+    </div>
+
+    <div class="section-title">إحصائياتك</div>
+    <div class="card">
+      <div class="row"><span class="k">أرباح اليوم</span><span class="v" id="statToday">0.000 TON</span></div>
+      <div class="row"><span class="k">إجمالي المشاهدات</span><span class="v" id="statViews">0</span></div>
+      <div class="row"><span class="k">الحد اليومي المتبقي</span><span class="v" id="statLeft">20</span></div>
+    </div>
+    <div class="hint">يتجدد الحد اليومي للمشاهدات كل 24 ساعة. المكافأة تُحتسب فقط بعد تأكيد الخادم لاكتمال المشاهدة.</div>
+  </section>
+
+  <!-- ===== Mining ===== -->
+  <section class="view" id="view-mining">
+    <div class="section-title">التعدين التلقائي</div>
+    <div class="card mining-card">
+      <div class="row">
+        <span class="k">معدل التعدين</span>
+        <span class="rate-pill">⚡ 0.0004 TON / ساعة</span>
+      </div>
+      <div class="row"><span class="k">الرصيد المُعدَّن غير المُحصَّل</span><span class="v" id="miningPending">0.0000 TON</span></div>
+      <div class="row"><span class="k">الوقت المتبقي للحد الأقصى</span><span class="v" id="miningTimer">04:00:00</span></div>
+    </div>
+    <button class="btn btn-primary" id="claimMiningBtn">تحصيل الأرباح</button>
+    <div class="hint">التعدين يتوقف تلقائيًا عند الوصول للحد الأقصى للتخزين (مثال: 8 ساعات) — افتح التطبيق لتحصيل الرصيد وإعادة التشغيل.</div>
+
+    <div class="section-title">رفع سرعة التعدين</div>
+    <div class="card">
+      <div class="row"><span class="k">المستوى الحالي</span><span class="v">1</span></div>
+      <div class="row"><span class="k">الترقية القادمة</span><span class="v">×1.5 السرعة</span></div>
+    </div>
+    <button class="btn btn-ghost" id="boostBtn">مشاهدة إعلان لمضاعفة السرعة 3 ساعات</button>
+  </section>
+
+  <!-- ===== Referrals ===== -->
+  <section class="view" id="view-ref">
+    <div class="section-title">ادعُ أصدقاءك</div>
+    <div class="card">
+      <div class="row"><span class="k">مكافأتك عن كل صديق</span><span class="v">0.01 TON</span></div>
+      <div class="row"><span class="k">نسبتك من أرباح إحالاتك</span><span class="v">10%</span></div>
+    </div>
+    <div class="section-title">رابط الإحالة الخاص بك</div>
+    <div class="ref-link" id="refLink">t.me/YourBot?start=ref_000000</div>
+    <button class="btn btn-primary" id="copyRefBtn" style="margin-top:10px;">نسخ الرابط</button>
+    <button class="btn btn-ghost" id="shareRefBtn" style="margin-top:10px;">مشاركة عبر تيليجرام</button>
+
+    <div class="section-title">إحالاتك (<span id="refCount">0</span>)</div>
+    <div class="card">
+      <div class="empty" id="refEmpty">لا يوجد أصدقاء مدعوّين بعد. شارك رابطك لتبدأ بالربح.</div>
+    </div>
+  </section>
+
+  <!-- ===== Withdraw ===== -->
+  <section class="view" id="view-withdraw">
+    <div class="section-title">سحب الأرباح</div>
+    <div class="card">
+      <div class="row"><span class="k">الرصيد القابل للسحب</span><span class="v" id="withdrawableBalance">0.000 TON</span></div>
+      <div class="row"><span class="k">الحد الأدنى للسحب</span><span class="v">1.000 TON</span></div>
+    </div>
+
+    <input class="input" id="tonWallet" placeholder="عنوان محفظة TON (UQ... / EQ...)" dir="ltr">
+    <input class="input" id="withdrawAmount" placeholder="المبلغ (TON)" dir="ltr" inputmode="decimal">
+    <button class="btn btn-ton" id="withdrawBtn">طلب سحب</button>
+
+    <div class="hint warn">
+      السحب يُرسَل كطلب إلى الخادم للمراجعة والتنفيذ اليدوي/التلقائي عبر TON — لا يتم توقيع أو إرسال أي معاملة من داخل هذه الصفحة مباشرة، حماية لمفاتيح المستخدمين.
+    </div>
+
+    <div class="section-title">سجل عمليات السحب</div>
+    <div class="card">
+      <div class="empty" id="withdrawHistoryEmpty">لا توجد عمليات سحب سابقة.</div>
+    </div>
+  </section>
+
+</main>
+
+<nav>
+  <button class="tab active" data-view="view-home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+    <span>الرئيسية</span>
+  </button>
+  <button class="tab" data-view="view-mining">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Z"/><path d="M9.5 12.5 11 14l3.5-3.5"/></svg>
+    <span>التعدين</span>
+  </button>
+  <button class="tab" data-view="view-ref">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.2c2.2.5 3.8 2.2 3.8 5.8"/></svg>
+    <span>الإحالات</span>
+  </button>
+  <button class="tab" data-view="view-withdraw">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10.5h19"/><path d="M6 15h4"/></svg>
+    <span>السحب</span>
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   إعدادات — عدّل هذه القيم قبل النشر
+   ========================================================= */
+const CONFIG = {
+  ADSGRAM_BLOCK_ID: "int-00000",     // من partner.adsgram.ai
+  DAILY_AD_LIMIT: 20,
+  REWARD_PER_AD: 0.002,              // TON
+  BACKEND_BASE_URL: "https://your-app.up.railway.app", // خادم Railway
+  BOT_USERNAME: "YourBot",
+};
+
+/* =========================================================
+   Telegram WebApp init
+   ========================================================= */
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor?.("#0b131c");
+  tg.setBackgroundColor?.("#0b131c");
+
+  const user = tg.initDataUnsafe?.user;
+  if (user) {
+    document.getElementById("avatarInitial").textContent =
+      (user.first_name || "U").trim().charAt(0).toUpperCase();
+    document.getElementById("refLink").textContent =
+      `t.me/${CONFIG.BOT_USERNAME}?start=ref_${user.id}`;
+  }
+}
+
+/* =========================================================
+   ⚠️ هام: initData يجب أن يُتحقق منه على الخادم فقط
+   (باستخدام bot token لحساب الـ HMAC) قبل قبول أي مكافأة.
+   لا تثق أبدًا بأي رصيد/حساب قادم من الواجهة الأمامية وحدها.
+   مثال على ما يُرسَل للخادم مع كل طلب:
+   fetch(`${CONFIG.BACKEND_BASE_URL}/api/...`, {
+     headers: { "X-Telegram-Init-Data": tg.initData }
+   })
+   ========================================================= */
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(tab.dataset.view).classList.add("active");
+    tg?.HapticFeedback?.selectionChanged();
+  });
+});
+
+/* =========================================================
+   Toast
+   ========================================================= */
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+/* =========================================================
+   حالة محلية (تجريبية) — استبدلها بجلب فعلي من الخادم/Firestore
+   ========================================================= */
+let state = {
+  balance: 0,
+  viewsToday: 0,
+  totalViews: 0,
+};
+
+function renderBalance() {
+  document.getElementById("balanceValue").textContent = state.balance.toFixed(3);
+  document.getElementById("withdrawableBalance").textContent = state.balance.toFixed(3) + " TON";
+  document.getElementById("statToday").textContent = (state.viewsToday * CONFIG.REWARD_PER_AD).toFixed(3) + " TON";
+  document.getElementById("statViews").textContent = state.totalViews;
+  const left = Math.max(0, CONFIG.DAILY_AD_LIMIT - state.viewsToday);
+  document.getElementById("statLeft").textContent = left;
+  document.getElementById("progressLabel").textContent = `${state.viewsToday} / ${CONFIG.DAILY_AD_LIMIT} مشاهدة اليوم`;
+  document.getElementById("orbRing").style.setProperty("--progress", Math.min(100, (state.viewsToday / CONFIG.DAILY_AD_LIMIT) * 100));
+  document.getElementById("orbBtn").disabled = left <= 0;
+}
+renderBalance();
+
+/* =========================================================
+   AdsGram — عرض إعلان مكافأة
+   ========================================================= */
+let AdController = null;
+try {
+  AdController = window.Adsgram?.init({ blockId: CONFIG.ADSGRAM_BLOCK_ID, debug: true });
+} catch (e) {
+  console.warn("Adsgram init failed", e);
+}
+
+function burstCoins() {
+  const wrap = document.getElementById("burst");
+  for (let i = 0; i < 10; i++) {
+    const s = document.createElement("div");
+    s.className = "spark";
+    const angle = (Math.PI * 2 * i) / 10;
+    const dist = 70 + Math.random() * 20;
+    s.style.setProperty("--x", Math.cos(angle) * dist + "px");
+    s.style.setProperty("--y", Math.sin(angle) * dist + "px");
+    s.animate([
+      { transform: "translate(-50%,-50%) scale(1)", opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(0)`, opacity: 0 }
+    ], { duration: 650, easing: "ease-out" });
+    wrap.appendChild(s);
+    setTimeout(() => s.remove(), 650);
+  }
+}
+
+document.getElementById("orbBtn").addEventListener("click", async () => {
+  if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) {
+    showToast("وصلت للحد الأقصى اليوم");
+    return;
+  }
+  if (!AdController) {
+    showToast("الإعلانات غير متاحة حاليًا");
+    return;
+  }
+  try {
+    await AdController.show();
+    // ✅ المشاهدة اكتملت في المتصفح — لكن الاعتماد النهائي على المكافأة
+    // يجب أن يتم عبر Reward Postback URL من AdsGram إلى خادمك (server-to-server)
+    // وليس فقط من هذا الحدث في الواجهة، لمنع التلاعب.
+    await confirmAdViewOnServer();
+    state.balance += CONFIG.REWARD_PER_AD;
+    state.viewsToday += 1;
+    state.totalViews += 1;
+    renderBalance();
+    burstCoins();
+    tg?.HapticFeedback?.notificationOccurred("success");
+    showToast(`+${CONFIG.REWARD_PER_AD} TON 🎉`);
+  } catch (err) {
+    console.warn("ad error", err);
+    showToast("لم تكتمل المشاهدة");
+  }
+});
+
+async function confirmAdViewOnServer() {
+  // مثال — استبدله بنداء فعلي لخادمك على Railway
+  // const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/ad-view/confirm`, {
+  //   method: "POST",
+  //   headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg.initData },
+  // });
+  // if (!res.ok) throw new Error("server rejected reward");
+  return true;
+}
+
+/* =========================================================
+   Mining (واجهة فقط — المنطق الفعلي والحساب يجب أن يتما في الخادم)
+   ========================================================= */
+document.getElementById("claimMiningBtn").addEventListener("click", () => {
+  showToast("تم تحصيل أرباح التعدين");
+});
+document.getElementById("boostBtn").addEventListener("click", async () => {
+  if (!AdController) { showToast("الإعلانات غير متاحة حاليًا"); return; }
+  try {
+    await AdController.show();
+    showToast("تم تفعيل مضاعفة السرعة لمدة 3 ساعات");
+  } catch { showToast("لم تكتمل المشاهدة"); }
+});
+
+/* =========================================================
+   Referrals
+   ========================================================= */
+document.getElementById("copyRefBtn").addEventListener("click", () => {
+  const link = document.getElementById("refLink").textContent;
+  navigator.clipboard?.writeText("https://" + link).then(() => showToast("تم نسخ الرابط"));
+});
+document.getElementById("shareRefBtn").addEventListener("click", () => {
+  const link = document.getElementById("refLink").textContent;
+  tg?.openTelegramLink?.(`https://t.me/share/url?url=https://${link}&text=${encodeURIComponent("انضم واربح TON مقابل مشاهدة الإعلانات!")}`);
+});
+
+/* =========================================================
+   Withdraw — يرسل طلبًا فقط، لا يوقّع أي معاملة من الواجهة
+   ========================================================= */
+document.getElementById("withdrawBtn").addEventListener("click", async () => {
+  const wallet = document.getElementById("tonWallet").value.trim();
+  const amount = parseFloat(document.getElementById("withdrawAmount").value);
+
+  if (!wallet || (!wallet.startsWith("UQ") && !wallet.startsWith("EQ"))) {
+    showToast("أدخل عنوان محفظة TON صحيح"); return;
+  }
+  if (!amount || amount < 1) {
+    showToast("الحد الأدنى للسحب هو 1 TON"); return;
+  }
+  if (amount > state.balance) {
+    showToast("الرصيد غير كافٍ"); return;
+  }
+
+  // مثال — استبدله بنداء فعلي لخادمك
+  // await fetch(`${CONFIG.BACKEND_BASE_URL}/api/withdraw`, {
+  //   method: "POST",
+  //   headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg.initData },
+  //   body: JSON.stringify({ wallet, amount })
+  // });
+
+  showToast("تم إرسال طلب السحب للمراجعة");
+});
+</script>
+</body>
+</html>

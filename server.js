@@ -1,22 +1,22 @@
 /**
- * TapEarn Backend — Express + Firebase Admin SDK
+ * CrypStore 🏹 Backend — Express + Firebase Admin SDK
  * ------------------------------------------------
  * هذا السيرفر هو المكان الوحيد المسموح له بالكتابة على Firestore.
  * الواجهة الأمامية (index.html) لا تكتب على قاعدة البيانات مباشرة أبدًا.
  *
  * متغيرات البيئة المطلوبة (Render → Environment، أو Railway → Variables):
- *  - BOT_TOKEN                : توكن بوت تيليجرام من BotFather
- *  - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
- *                                Firebase Console > Project settings > Service accounts
- *  - REWARD_PER_AD            : (اختياري) قيمة المكافأة لكل إعلان، افتراضي 0.002
- *  - DAILY_AD_LIMIT           : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
- *  - MIN_WITHDRAW             : (اختياري) حد أدنى السحب، افتراضي 0.2
- *  - WEBAPP_URL               : رابط GitHub Pages (متلا https://samsamytff33.github.io/WEB/)
- *  - BOT_USERNAME             : يوزر البوت بدون @ (لبناء روابط الإحالة)
- *  - REFERRAL_REWARD          : (اختياري) مكافأة كل إحالة نشطة، افتراضي 0.01
- *  - TELEGRAM_WEBHOOK_SECRET  : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
- *                                الطلبات الواردة على /api/telegram/webhook
- *                                فعليًا من تيليجرام وليس من أي جهة أخرى
+ * - BOT_TOKEN               : توكن بوت تيليجرام من BotFather
+ * - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
+ *                               Firebase Console > Project settings > Service accounts
+ * - REWARD_PER_AD           : (اختياري) قيمة المكافأة لكل إعلان، افتراضي 0.002
+ * - DAILY_AD_LIMIT          : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
+ * - MIN_WITHDRAW            : (اختياري) حد أدنى السحب، افتراضي 0.2
+ * - WEBAPP_URL              : رابط GitHub Pages (مثلاً https://samsamytff33.github.io/WEB/)
+ * - BOT_USERNAME            : يوزر البوت بدون @ (لبناء روابط الإحالة) — الآن CrypStorebot
+ * - REFERRAL_REWARD         : (اختياري) مكافأة كل إحالة نشطة، افتراضي 0.01
+ * - TELEGRAM_WEBHOOK_SECRET : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
+ *                               الطلبات الواردة على /api/telegram/webhook
+ *                               فعليًا من تيليجرام وليس من أي جهة أخرى
  */
 
 const express = require("express");
@@ -42,13 +42,15 @@ if (!BOT_TOKEN) {
   console.error("BOT_TOKEN env var is missing.");
   process.exit(1);
 }
+
 const REWARD_PER_AD = parseFloat(process.env.REWARD_PER_AD || "0.002");
 const DAILY_AD_LIMIT = parseInt(process.env.DAILY_AD_LIMIT || "20", 10);
 const MIN_WITHDRAW = parseFloat(process.env.MIN_WITHDRAW || "0.2");
 const WEBAPP_URL = process.env.WEBAPP_URL || "https://samsamytff33.github.io/WEB/";
-const BOT_USERNAME = process.env.BOT_USERNAME || "Bbotfrubot";
+const BOT_USERNAME = process.env.BOT_USERNAME || "CrypStorebot";
 const REFERRAL_REWARD = parseFloat(process.env.REFERRAL_REWARD || "0.01");
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 const app = express();
@@ -61,7 +63,6 @@ app.use(express.json());
 // =========================================================
 function verifyInitData(initData) {
   if (!initData) return null;
-
   const urlParams = new URLSearchParams(initData);
   const hash = urlParams.get("hash");
   if (!hash) return null;
@@ -85,6 +86,7 @@ function verifyInitData(initData) {
 
   const userJson = urlParams.get("user");
   if (!userJson) return null;
+
   return JSON.parse(userJson); // { id, first_name, username, ... }
 }
 
@@ -105,7 +107,7 @@ function todayKey() {
 
 // =========================================================
 // توليد كود إحالة قصير وفريد (6 محارف، بدون رموز ملتبسة زي 0/O أو 1/l/I)
-// ========================================================
+// =========================================================
 const REF_CODE_CHARS = "23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ";
 function generateReferralCode(length = 6) {
   let code = "";
@@ -299,7 +301,7 @@ app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
 // =========================================================
 // POST /api/telegram/webhook
 // يستقبل تحديثات البوت من تيليجرام (رسائل، أوامر). عند /start
-// يرد بزر يفتح الـ Web App.
+// يرد برسالة ترحيب احترافية وزر يفتح الـ Web App.
 // =========================================================
 async function sendTelegramMessage(chatId, text, replyMarkup) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -308,6 +310,7 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
     body: JSON.stringify({
       chat_id: chatId,
       text,
+      parse_mode: "HTML",
       reply_markup: replyMarkup,
     }),
   });
@@ -321,6 +324,7 @@ async function sendTelegramPhoto(chatId, photoUrl, caption, replyMarkup) {
       chat_id: chatId,
       photo: photoUrl,
       caption,
+      parse_mode: "HTML",
       reply_markup: replyMarkup,
     }),
   });
@@ -343,6 +347,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
   try {
     const update = req.body;
     const message = update.message;
+
     if (message && message.text) {
       const chatId = message.chat.id;
       const text = message.text.trim();
@@ -370,16 +375,30 @@ app.post("/api/telegram/webhook", async (req, res) => {
           }
         }
 
+        const firstName = message.from?.first_name || "there";
+
+        // رسالة ترحيب احترافية عند /start — تحمل اسم وهوية CrypStore 🏹
+        const welcomeCaption =
+          `<b>🏹 Welcome to CrypStore, ${firstName}!</b>\n\n` +
+          `CrypStore is your gateway to earning real TON — simply by watching ads, inviting friends, and letting auto-mining work for you around the clock.\n\n` +
+          `<b>What you can do here:</b>\n` +
+          `💠 Watch short ads and earn TON instantly\n` +
+          `⛏ Auto-mine TON passively over time\n` +
+          `🤝 Invite friends and earn referral rewards\n` +
+          `💸 Withdraw straight to your TON wallet\n\n` +
+          `Tap <b>Open App</b> below to get started.`;
+
         await sendTelegramPhoto(
           chatId,
           `${WEBAPP_URL}assets/logo_1.png`,
-          "Welcome to TapEarn.\nWatch ads, earn TON, and withdraw straight to your wallet. Tap below to get started.",
+          welcomeCaption,
           {
-            inline_keyboard: [[{ text: "Open App", web_app: { url: WEBAPP_URL } }]],
+            inline_keyboard: [[{ text: "🏹 Open CrypStore", web_app: { url: WEBAPP_URL } }]],
           }
         );
       }
     }
+
     res.sendStatus(200); // لازم ترد 200 دائمًا، وإلا تيليجرام بيعيد المحاولة بشكل متكرر
   } catch (e) {
     console.error("webhook error", e);
@@ -463,7 +482,7 @@ app.post("/api/referrals/claim", requireTelegramAuth, async (req, res) => {
 });
 
 // ---------- health check ----------
-app.get("/", (req, res) => res.send("TapEarn backend is running."));
+app.get("/", (req, res) => res.send("CrypStore backend is running."));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

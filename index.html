@@ -42,6 +42,15 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+/* ===== Disable text selection / copy / long-press menu across the app ===== */
+*{
+  -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; user-select:none;
+  -webkit-touch-callout:none;
+}
+input, textarea{
+  -webkit-user-select:text; -moz-user-select:text; -ms-user-select:text; user-select:text;
+  -webkit-touch-callout:default;
+}
 html,body{ height:100%; background:var(--bg); color:var(--text); font-family:'Tajawal', -apple-system, system-ui, sans-serif; overscroll-behavior:none; }
 body{
   display:flex; flex-direction:column; min-height:100vh;
@@ -750,7 +759,31 @@ document.getElementById("withdrawBtn").addEventListener("click", async () => {
 });
 
 /* =========================================================
-   12) Entry point
+   12) Disable copy / long-press context menu / text selection
+   Applies everywhere except inputs & textareas (wallet address,
+   withdraw amount) which must stay copy/paste-able.
+   ========================================================= */
+function isEditableTarget(el) {
+  return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+}
+document.addEventListener("contextmenu", (e) => {
+  if (!isEditableTarget(e.target)) e.preventDefault();
+});
+document.addEventListener("selectstart", (e) => {
+  if (!isEditableTarget(e.target)) e.preventDefault();
+});
+document.addEventListener("copy", (e) => {
+  if (!isEditableTarget(e.target)) e.preventDefault();
+});
+document.addEventListener("cut", (e) => {
+  if (!isEditableTarget(e.target)) e.preventDefault();
+});
+document.addEventListener("dragstart", (e) => {
+  if (!isEditableTarget(e.target)) e.preventDefault();
+});
+
+/* =========================================================
+   13) Entry point
    ========================================================= */
 window.addEventListener("DOMContentLoaded", async () => {
   await runSplashSequence();
@@ -762,4 +795,3 @@ window.addEventListener("DOMContentLoaded", async () => {
 </script>
 </body>
 </html>
- 

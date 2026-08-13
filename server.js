@@ -1,20 +1,5 @@
 /**
  * TapEarn Backend — Express + Firebase Admin SDK
- * ------------------------------------------------
- * هذا السيرفر هو المكان الوحيد المسموح له بالكتابة على Firestore.
- * الواجهة الأمامية (index.html) لا تكتب على قاعدة البيانات مباشرة أبدًا.
- *
- * متغيرات البيئة المطلوبة (Render → Environment، أو Railway → Variables):
- *  - BOT_TOKEN                : توكن بوت تيليجرام من BotFather
- *  - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
- *                                Firebase Console > Project settings > Service accounts
- *  - REWARD_PER_AD            : (اختياري) قيمة المكافأة لكل إعلان، افتراضي 0.002
- *  - DAILY_AD_LIMIT           : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
- *  - MIN_WITHDRAW             : (اختياري) حد أدنى السحب، افتراضي 0.2
- *  - WEBAPP_URL               : رابط GitHub Pages (متلا https://samsamytff33.github.io/WEB/)
- *  - TELEGRAM_WEBHOOK_SECRET  : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
- *                                الطلبات الواردة على /api/telegram/webhook
- *                                فعليًا من تيليجرام وليس من أي جهة أخرى
  */
 
 const express = require("express");
@@ -53,7 +38,6 @@ app.use(express.json());
 
 // =========================================================
 // التحقق من صحة Telegram initData
-// المرجع الرسمي: https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
 // =========================================================
 function verifyInitData(initData) {
   if (!initData) return null;
@@ -74,17 +58,16 @@ function verifyInitData(initData) {
 
   if (computedHash !== hash) return null;
 
-  // تحقق اختياري إضافي: رفض initData أقدم من ساعة (يمنع إعادة استخدام قديمة)
   const authDate = parseInt(urlParams.get("auth_date") || "0", 10);
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (nowSeconds - authDate > 3600) return null;
 
   const userJson = urlParams.get("user");
   if (!userJson) return null;
-  return JSON.parse(userJson); // { id, first_name, username, ... }
+  return JSON.parse(userJson);
 }
 
-// Middleware: يتحقق من initData ويحط user بالـ request
+// Middleware: يتحقق من initData
 function requireTelegramAuth(req, res, next) {
   const initData = req.headers["x-telegram-init-data"] || (req.body && req.body.initData) || "";
   const user = verifyInitData(initData);
@@ -96,12 +79,11 @@ function requireTelegramAuth(req, res, next) {
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+  return new Date().toISOString().slice(0, 10);
 }
 
 // =========================================================
-// POST /api/auth/verify
-// يتحقق من initData وينشئ مستند المستخدم إذا ما كان موجود
+// Endpoints المتجر والحساب
 // =========================================================
 app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
   try {
@@ -130,12 +112,6 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
   }
 });
 
-// =========================================================
-// POST /api/ads/confirm
-// ⚠️ هذا endpoint مؤقت للتطوير. بالنشر الفعلي، يُستحسن استبداله
-// أو تعزيزه بـ Reward Postback URL من AdsGram (server-to-server)
-// حتى لا يعتمد منح المكافأة على حدث المتصفح فقط.
-// =========================================================
 app.post("/api/ads/confirm", requireTelegramAuth, async (req, res) => {
   try {
     const userId = String(req.tgUser.id);
@@ -146,7 +122,6 @@ app.post("/api/ads/confirm", requireTelegramAuth, async (req, res) => {
       if (!doc.exists) throw new Error("user not found");
       const data = doc.data();
 
-      // إعادة تصفير العداد اليومي إذا تغير اليوم
       const today = todayKey();
       let viewsToday = data.viewsToday || 0;
       if (data.lastViewDate !== today) viewsToday = 0;
@@ -170,12 +145,6 @@ app.post("/api/ads/confirm", requireTelegramAuth, async (req, res) => {
   }
 });
 
-// =========================================================
-// POST /api/withdraw/request
-// ينشئ طلب سحب بحالة "pending" فقط — لا تحويل تلقائي هنا.
-// التنفيذ الفعلي (إرسال TON) يجب أن يتم يدويًا أو بمنطق منفصل
-// تراجعه بنفسك قبل التنفيذ.
-// =========================================================
 app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
   try {
     const userId = String(req.tgUser.id);
@@ -197,7 +166,6 @@ app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
       const balance = doc.data().balance || 0;
       if (amt > balance) throw new Error("insufficient balance");
 
-      // خصم فوري لمنع طلبات سحب مكررة لنفس الرصيد
       tx.update(userRef, { balance: admin.firestore.FieldValue.increment(-amt) });
 
       const withdrawRef = db.collection("withdrawals").doc();
@@ -218,39 +186,48 @@ app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
 });
 
 // =========================================================
-// POST /api/telegram/webhook
-// يستقبل تحديثات البوت من تيليجرام (رسائل، أوامر). عند /start
-// يرد بزر يفتح الـ Web App.
+// POST /api/telegram/webhook (المُصَحَّح)
 // =========================================================
 async function sendTelegramMessage(chatId, text, replyMarkup) {
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      reply_markup: replyMarkup,
-    }),
-  });
+  try {
+    const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        reply_markup: replyMarkup,
+      }),
+    });
+    const data = await response.json();
+    console.log("Telegram API Response:", data);
+  } catch (err) {
+    console.error("Error sending Telegram message:", err);
+  }
 }
 
 app.post("/api/telegram/webhook", async (req, res) => {
-  // تحقق أن الطلب فعليًا من تيليجرام (Secret Token الذي تضبطه أنت عند تسجيل الـ webhook)
+  console.log("--> Webhook hit! Headers received.");
+
   if (TELEGRAM_WEBHOOK_SECRET) {
     const incomingSecret = req.headers["x-telegram-bot-api-secret-token"];
     if (incomingSecret !== TELEGRAM_WEBHOOK_SECRET) {
+      console.warn("Unauthorized Webhook access attempt: Secret mismatch!");
       return res.sendStatus(401);
     }
   }
 
   try {
     const update = req.body;
+    console.log("Incoming Telegram Update:", JSON.stringify(update));
+
     const message = update.message;
     if (message && message.text) {
       const chatId = message.chat.id;
       const text = message.text.trim();
 
-      if (text === "/start") {
+      if (text.startsWith("/start")) {
+        console.log(`Sending response to Chat ID: ${chatId}`);
         await sendTelegramMessage(
           chatId,
           "أهلاً بك في TapEarn 👋\nاضغط الزر تحت لفتح التطبيق وابدأ الربح.",
@@ -260,9 +237,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
         );
       }
     }
-    res.sendStatus(200); // لازم ترد 200 دائمًا، وإلا تيليجرام بيعيد المحاولة بشكل متكرر
+    res.sendStatus(200);
   } catch (e) {
-    console.error("webhook error", e);
+    console.error("Webhook Internal Error:", e);
     res.sendStatus(200);
   }
 });

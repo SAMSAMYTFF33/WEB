@@ -1,555 +1,450 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>TapEarn — اربح من مشاهدة الإعلانات</title>
+/**
+ * TapEarn Backend — Express + Firebase Admin SDK
+ * ------------------------------------------------
+ * هذا السيرفر هو المكان الوحيد المسموح له بالكتابة على Firestore.
+ * الواجهة الأمامية (index.html) لا تكتب على قاعدة البيانات مباشرة أبدًا.
+ *
+ * متغيرات البيئة المطلوبة (Render → Environment، أو Railway → Variables):
+ *  - BOT_TOKEN                : توكن بوت تيليجرام من BotFather
+ *  - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
+ *                                Firebase Console > Project settings > Service accounts
+ *  - REWARD_PER_AD            : (اختياري) قيمة المكافأة لكل إعلان، افتراضي 0.002
+ *  - DAILY_AD_LIMIT           : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
+ *  - MIN_WITHDRAW             : (اختياري) حد أدنى السحب، افتراضي 0.2
+ *  - WEBAPP_URL               : رابط GitHub Pages (متلا https://samsamytff33.github.io/WEB/)
+ *  - BOT_USERNAME             : يوزر البوت بدون @ (لبناء روابط الإحالة)
+ *  - REFERRAL_REWARD          : (اختياري) مكافأة كل إحالة نشطة، افتراضي 0.01
+ *  - TELEGRAM_WEBHOOK_SECRET  : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
+ *                                الطلبات الواردة على /api/telegram/webhook
+ *                                فعليًا من تيليجرام وليس من أي جهة أخرى
+ */
 
-<!-- Telegram WebApp SDK -->
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+const express = require("express");
+const cors = require("cors");
+const crypto = require("crypto");
+const admin = require("firebase-admin");
 
-<!-- AdsGram SDK -->
-<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+// ---------- إعداد Firebase Admin ----------
+const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+if (!serviceAccountRaw) {
+  console.error("FIREBASE_SERVICE_ACCOUNT env var is missing.");
+  process.exit(1);
+}
+const serviceAccount = JSON.parse(serviceAccountRaw);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+const db = admin.firestore();
 
-<!-- Firebase (compat build — أبسط للدمج بدون bundler) -->
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+// ---------- إعدادات عامة ----------
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) {
+  console.error("BOT_TOKEN env var is missing.");
+  process.exit(1);
+}
+const REWARD_PER_AD = parseFloat(process.env.REWARD_PER_AD || "0.002");
+const DAILY_AD_LIMIT = parseInt(process.env.DAILY_AD_LIMIT || "20", 10);
+const MIN_WITHDRAW = parseFloat(process.env.MIN_WITHDRAW || "0.2");
+const WEBAPP_URL = process.env.WEBAPP_URL || "https://samsamytff33.github.io/WEB/";
+const BOT_USERNAME = process.env.BOT_USERNAME || "Bbotfrubot";
+const REFERRAL_REWARD = parseFloat(process.env.REFERRAL_REWARD || "0.01");
+const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-<style>
-  :root{
-    --bg:#0b131c;
-    --surface:#131f2b;
-    --surface-2:#1b2a38;
-    --border:rgba(255,255,255,.06);
-    --text:#e9eef4;
-    --text-muted:#8695a6;
-    --tg-blue:#2aabee;
-    --tg-blue-2:#229ed9;
-    --ton-blue:#0098ea;
-    --gold:#f6b73c;
-    --gold-2:#ffd77a;
-    --danger:#ef5b5b;
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
+// =========================================================
+// التحقق من صحة Telegram initData
+// المرجع الرسمي: https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
+// =========================================================
+function verifyInitData(initData) {
+  if (!initData) return null;
+
+  const urlParams = new URLSearchParams(initData);
+  const hash = urlParams.get("hash");
+  if (!hash) return null;
+  urlParams.delete("hash");
+
+  const dataCheckArr = [];
+  for (const [key, value] of [...urlParams.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    dataCheckArr.push(`${key}=${value}`);
   }
-  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
-  html,body{ height:100%; background:var(--bg); color:var(--text); font-family:'Tajawal', -apple-system, system-ui, sans-serif; overscroll-behavior:none; }
-  body{ display:flex; flex-direction:column; min-height:100vh; font-variant-numeric: tabular-nums; }
-  ::-webkit-scrollbar{ display:none; }
+  const dataCheckString = dataCheckArr.join("\n");
 
-  /* ===== Splash ===== */
-  #splash{
-    position:fixed; inset:0; z-index:100;
-    background: radial-gradient(circle at 50% 30%, #16273a, var(--bg) 70%);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
-    transition: opacity .35s ease, visibility .35s ease;
-  }
-  #splash.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
-  .splash-logo{
-    width:76px; height:76px; border-radius:22px;
-    background: conic-gradient(from 200deg, var(--gold), var(--gold-2), var(--gold));
-    display:flex; align-items:center; justify-content:center; font-size:32px;
-    box-shadow: 0 0 30px rgba(246,183,60,.35);
-    animation: pulse 1.6s ease-in-out infinite;
-  }
-  @keyframes pulse{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.06);} }
-  .splash-title{ font-weight:900; font-size:18px; letter-spacing:.3px; }
-  .splash-bar-track{ width:180px; height:6px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
-  .splash-bar-fill{ height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg, var(--tg-blue), var(--gold)); transition:width .25s ease; }
-  .splash-status{ font-size:12px; color:var(--text-muted); min-height:16px; }
+  const secretKey = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+  const computedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
 
-  /* ===== Header ===== */
-  header{ padding: calc(14px + var(--safe-top)) 16px 14px; background: linear-gradient(180deg, #0e1a26 0%, var(--bg) 100%); border-bottom: 1px solid var(--border); position: sticky; top:0; z-index:10; }
-  .header-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-  .brand{ display:flex; align-items:center; gap:8px; }
-  .brand-dot{ width:10px; height:10px; border-radius:50%; background: radial-gradient(circle at 30% 30%, var(--gold-2), var(--gold)); box-shadow: 0 0 10px rgba(246,183,60,.6); }
-  .brand span{ font-weight:800; font-size:15px; letter-spacing:.2px; }
-  .avatar{ width:34px; height:34px; border-radius:50%; background: linear-gradient(135deg, var(--tg-blue), var(--tg-blue-2)); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; }
-  .balance-card{ background: linear-gradient(135deg, var(--surface-2), var(--surface)); border:1px solid var(--border); border-radius:18px; padding:16px 18px; display:flex; align-items:center; justify-content:space-between; }
-  .balance-label{ font-size:12px; color:var(--text-muted); margin-bottom:6px; }
-  .balance-value{ font-size:26px; font-weight:900; display:flex; align-items:baseline; gap:6px; }
-  .balance-value .unit{ font-size:13px; color:var(--gold); font-weight:700; }
-  .balance-usd{ font-size:11px; color:var(--text-muted); margin-top:4px; }
-  .coin-icon{ width:46px; height:46px; border-radius:50%; background: conic-gradient(from 200deg, var(--gold), var(--gold-2), var(--gold)); display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow: 0 0 18px rgba(246,183,60,.35); }
+  if (computedHash !== hash) return null;
 
-  main{ flex:1; padding: 18px 16px calc(96px + var(--safe-bottom)); }
-  .view{ display:none; animation: fadein .25s ease; }
-  .view.active{ display:block; }
-  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
-  .section-title{ font-size:14px; font-weight:800; color:var(--text-muted); margin: 22px 0 10px; }
-  .section-title:first-child{ margin-top:0; }
+  // تحقق اختياري إضافي: رفض initData أقدم من ساعة (يمنع إعادة استخدام قديمة)
+  const authDate = parseInt(urlParams.get("auth_date") || "0", 10);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (nowSeconds - authDate > 3600) return null;
 
-  .orb-wrap{ display:flex; flex-direction:column; align-items:center; padding: 20px 0 6px; }
-  .orb{ position:relative; width:190px; height:190px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; border:none; background:none; }
-  .orb-ring{ position:absolute; inset:0; border-radius:50%; background: conic-gradient(var(--gold) calc(var(--progress, 0) * 1%), rgba(255,255,255,.07) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px)); mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px)); transition: background 1s ease; }
-  .orb-core{ position:relative; width:150px; height:150px; border-radius:50%; background: radial-gradient(circle at 32% 28%, #24384a, #101c27 70%); border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; box-shadow: inset 0 0 30px rgba(0,0,0,.4); transition: transform .12s ease; }
-  .orb:active .orb-core{ transform: scale(.96); }
-  .orb-core .icon{ font-size:34px; filter: drop-shadow(0 0 8px rgba(246,183,60,.5)); }
-  .orb-core .cta{ font-size:13px; font-weight:800; }
-  .orb-core .sub{ font-size:11px; color:var(--text-muted); }
-  .orb-progress-label{ margin-top:14px; font-size:12px; color:var(--text-muted); }
-  .burst{ position:absolute; inset:0; pointer-events:none; }
-  .spark{ position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%; background: var(--gold-2); opacity:0; }
-
-  .card{ background: var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:12px; }
-  .row{ display:flex; align-items:center; justify-content:space-between; }
-  .row + .row{ margin-top:10px; }
-  .row .k{ font-size:13px; color:var(--text-muted); }
-  .row .v{ font-size:14px; font-weight:700; }
-  .btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; border-radius:14px; border:none; font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; color:#fff; }
-  .btn-primary{ background: linear-gradient(135deg, var(--tg-blue), var(--tg-blue-2)); }
-  .btn-ton{ background: linear-gradient(135deg, var(--ton-blue), #006fae); }
-  .btn-ghost{ background: var(--surface-2); color:var(--text); border:1px solid var(--border); }
-  .btn[disabled]{ opacity:.45; pointer-events:none; }
-  .input{ width:100%; padding:13px 14px; border-radius:12px; background: var(--surface-2); border:1px solid var(--border); color:var(--text); font-family:inherit; font-size:14px; margin-bottom:10px; }
-  .input::placeholder{ color:var(--text-muted); }
-  .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.7; margin-top:6px; }
-  .hint.warn{ color:#f2c14e; }
-  .ref-link{ display:flex; align-items:center; gap:8px; background: var(--surface-2); border:1px dashed rgba(255,255,255,.15); border-radius:12px; padding:12px; font-size:12.5px; color:var(--text-muted); direction:ltr; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .empty{ text-align:center; padding:26px 10px; color:var(--text-muted); font-size:13px; }
-  .mining-card{ background: linear-gradient(135deg, #1a2c22, var(--surface)); border:1px solid rgba(88,199,120,.18); }
-  .rate-pill{ display:inline-flex; align-items:center; gap:6px; background: rgba(88,199,120,.12); color:#7fe2a0; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:800; }
-
-  nav{ position:fixed; bottom:0; left:0; right:0; background: rgba(11,19,28,.92); backdrop-filter: blur(14px); border-top:1px solid var(--border); padding: 8px 10px calc(8px + var(--safe-bottom)); display:flex; gap:4px; z-index:20; }
-  .tab{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; color:var(--text-muted); font-family:inherit; padding:8px 2px; border-radius:12px; cursor:pointer; }
-  .tab svg{ width:22px; height:22px; }
-  .tab span{ font-size:10.5px; font-weight:700; }
-  .tab.active{ color:var(--tg-blue); background: rgba(42,171,238,.08); }
-  .tab.active svg{ filter: drop-shadow(0 0 6px rgba(42,171,238,.5)); }
-
-  .toast{ position:fixed; top: calc(12px + var(--safe-top)); left:50%; transform:translateX(-50%) translateY(-140%); background:#1c2a38; border:1px solid var(--border); color:var(--text); padding:10px 16px; border-radius:12px; font-size:13px; font-weight:700; z-index:50; transition: transform .25s ease; box-shadow:0 8px 24px rgba(0,0,0,.35); white-space:nowrap; }
-  .toast.show{ transform:translateX(-50%) translateY(0); }
-</style>
-</head>
-<body>
-
-<!-- ===================== Splash / Loading ===================== -->
-<div id="splash">
-  <div class="splash-logo">🪙</div>
-  <div class="splash-title">TapEarn</div>
-  <div class="splash-bar-track"><div class="splash-bar-fill" id="splashBarFill"></div></div>
-  <div class="splash-status" id="splashStatus">جارِ التحضير…</div>
-</div>
-
-<header>
-  <div class="header-row">
-    <div class="brand"><span class="brand-dot"></span><span>TapEarn</span></div>
-    <div class="avatar" id="avatarInitial">?</div>
-  </div>
-  <div class="balance-card">
-    <div>
-      <div class="balance-label">رصيدك الحالي</div>
-      <div class="balance-value"><span id="balanceValue">0.000</span><span class="unit">TON</span></div>
-      <div class="balance-usd" id="balanceUsd">≈ $0.00</div>
-    </div>
-    <div class="coin-icon">🪙</div>
-  </div>
-</header>
-
-<main>
-  <!-- ===== Home / Watch Ads ===== -->
-  <section class="view active" id="view-home">
-    <div class="orb-wrap">
-      <button class="orb" id="orbBtn">
-        <div class="orb-ring" id="orbRing"></div>
-        <div class="orb-core">
-          <div class="icon">▶</div>
-          <div class="cta">مشاهدة إعلان</div>
-          <div class="sub">+0.002 TON</div>
-        </div>
-        <div class="burst" id="burst"></div>
-      </button>
-      <div class="orb-progress-label" id="progressLabel">0 / 20 مشاهدة اليوم</div>
-    </div>
-    <div class="section-title">إحصائياتك</div>
-    <div class="card">
-      <div class="row"><span class="k">أرباح اليوم</span><span class="v" id="statToday">0.000 TON</span></div>
-      <div class="row"><span class="k">إجمالي المشاهدات</span><span class="v" id="statViews">0</span></div>
-      <div class="row"><span class="k">الحد اليومي المتبقي</span><span class="v" id="statLeft">20</span></div>
-    </div>
-    <div class="hint">يتجدد الحد اليومي للمشاهدات كل 24 ساعة. المكافأة تُحتسب فقط بعد تأكيد الخادم لاكتمال المشاهدة.</div>
-  </section>
-
-  <!-- ===== Mining ===== -->
-  <section class="view" id="view-mining">
-    <div class="section-title">التعدين التلقائي</div>
-    <div class="card mining-card">
-      <div class="row"><span class="k">معدل التعدين</span><span class="rate-pill">⚡ 0.0004 TON / ساعة</span></div>
-      <div class="row"><span class="k">الرصيد المُعدَّن غير المُحصَّل</span><span class="v" id="miningPending">0.0000 TON</span></div>
-      <div class="row"><span class="k">الوقت المتبقي للحد الأقصى</span><span class="v" id="miningTimer">04:00:00</span></div>
-    </div>
-    <button class="btn btn-primary" id="claimMiningBtn">تحصيل الأرباح</button>
-    <div class="hint">التعدين يتوقف تلقائيًا عند الوصول للحد الأقصى للتخزين — افتح التطبيق لتحصيل الرصيد وإعادة التشغيل.</div>
-    <div class="section-title">رفع سرعة التعدين</div>
-    <div class="card">
-      <div class="row"><span class="k">المستوى الحالي</span><span class="v">1</span></div>
-      <div class="row"><span class="k">الترقية القادمة</span><span class="v">×1.5 السرعة</span></div>
-    </div>
-    <button class="btn btn-ghost" id="boostBtn">مشاهدة إعلان لمضاعفة السرعة 3 ساعات</button>
-  </section>
-
-  <!-- ===== Referrals ===== -->
-  <section class="view" id="view-ref">
-    <div class="section-title">ادعُ أصدقاءك</div>
-    <div class="card">
-      <div class="row"><span class="k">مكافأتك عن كل إحالة نشطة</span><span class="v" id="refRewardRate">0.01 TON</span></div>
-      <div class="row"><span class="k">مكافآت غير مستلمة</span><span class="v" id="refUnclaimed">0.000 TON</span></div>
-    </div>
-    <button class="btn btn-primary" id="claimRefBtn" disabled>مطالبة بالمكافأة</button>
-    <div class="section-title">رابط الإحالة الخاص بك</div>
-    <div class="ref-link" id="refLink">جارِ التحميل…</div>
-    <button class="btn btn-primary" id="copyRefBtn" style="margin-top:10px;">نسخ الرابط</button>
-    <button class="btn btn-ghost" id="shareRefBtn" style="margin-top:10px;">مشاركة عبر تيليجرام</button>
-    <div class="section-title">إحالاتك (<span id="refCount">0</span>)</div>
-    <div class="card" id="refListCard"><div class="empty" id="refEmpty">لا يوجد أصدقاء مدعوّين بعد. شارك رابطك لتبدأ بالربح.</div></div>
-  </section>
-
-  <!-- ===== Withdraw ===== -->
-  <section class="view" id="view-withdraw">
-    <div class="section-title">سحب الأرباح</div>
-    <div class="card">
-      <div class="row"><span class="k">الرصيد القابل للسحب</span><span class="v" id="withdrawableBalance">0.000 TON</span></div>
-      <div class="row"><span class="k">الحد الأدنى للسحب</span><span class="v">0.200 TON</span></div>
-    </div>
-    <input class="input" id="tonWallet" placeholder="عنوان محفظة TON (UQ... / EQ...)" dir="ltr">
-    <input class="input" id="withdrawAmount" placeholder="المبلغ (TON)" dir="ltr" inputmode="decimal">
-    <button class="btn btn-ton" id="withdrawBtn">طلب سحب</button>
-    <div class="hint warn">السحب يُرسَل كطلب إلى الخادم للمراجعة والتنفيذ — لا يتم توقيع أو إرسال أي معاملة من داخل هذه الصفحة مباشرة، حماية لمفاتيح المستخدمين.</div>
-    <div class="section-title">سجل عمليات السحب</div>
-    <div class="card"><div class="empty" id="withdrawHistoryEmpty">لا توجد عمليات سحب سابقة.</div></div>
-  </section>
-</main>
-
-<nav>
-  <button class="tab active" data-view="view-home">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
-    <span>الرئيسية</span>
-  </button>
-  <button class="tab" data-view="view-mining">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Z"/><path d="M9.5 12.5 11 14l3.5-3.5"/></svg>
-    <span>التعدين</span>
-  </button>
-  <button class="tab" data-view="view-ref">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.2c2.2.5 3.8 2.2 3.8 5.8"/></svg>
-    <span>الإحالات</span>
-  </button>
-  <button class="tab" data-view="view-withdraw">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10.5h19"/><path d="M6 15h4"/></svg>
-    <span>السحب</span>
-  </button>
-</nav>
-
-<div class="toast" id="toast"></div>
-
-<script>
-/* =========================================================
-   1) إعدادات عامة — عدّل هذه القيم قبل النشر
-   ========================================================= */
-const CONFIG = {
-  ADSGRAM_BLOCK_ID: "int-00000",
-  DAILY_AD_LIMIT: 20,
-  REWARD_PER_AD: 0.002,
-  MIN_WITHDRAW: 0.2,
-  BACKEND_BASE_URL: "https://project-34m9.onrender.com",
-  BOT_USERNAME: "YourBot",
-  FIREBASE_CONFIG: {
-    apiKey: "AIzaSyAhRvNdTyX_S29wfjBdxQ1QR98XmNB_6WQ",
-    authDomain: "wep-app-1771a.firebaseapp.com",
-    projectId: "wep-app-1771a",
-    storageBucket: "wep-app-1771a.firebasestorage.app",
-    messagingSenderId: "568445406110",
-    appId: "1:568445406110:web:b2225d5747779e70a2248f",
-  },
-};
-
-/* =========================================================
-   2) Telegram WebApp init
-   ========================================================= */
-const tg = window.Telegram?.WebApp;
-let tgUser = null;
-function initTelegram() {
-  if (!tg) return;
-  tg.ready();
-  tg.expand();
-  tg.setHeaderColor?.("#0b131c");
-  tg.setBackgroundColor?.("#0b131c");
-  tgUser = tg.initDataUnsafe?.user || null;
-  if (tgUser) {
-    document.getElementById("avatarInitial").textContent =
-      (tgUser.first_name || "U").trim().charAt(0).toUpperCase();
-  }
+  const userJson = urlParams.get("user");
+  if (!userJson) return null;
+  return JSON.parse(userJson); // { id, first_name, username, ... }
 }
 
-/* =========================================================
-   3) Firebase init + مصادقة عبر الخادم
-   ⚠️ initData لا يُتحقق منه هنا. الخادم (Railway) هو من يحسب
-   HMAC عبر bot token ويرجّع نتيجة موثوقة. هذا الكود فقط
-   يرسل initData ويستقبل حالة تسجيل الدخول.
-   ========================================================= */
-let db = null;
-function initFirebase() {
-  firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
-  db = firebase.firestore();
+// Middleware: يتحقق من initData ويحط user بالـ request
+function requireTelegramAuth(req, res, next) {
+  const initData = req.headers["x-telegram-init-data"] || (req.body && req.body.initData) || "";
+  const user = verifyInitData(initData);
+  if (!user) {
+    return res.status(401).json({ error: "invalid or missing initData" });
+  }
+  req.tgUser = user;
+  next();
 }
 
-async function verifySessionOnServer() {
-  // يرسل initData الخام للخادم للتحقق منه بالـ HMAC + bot token
-  // ويُتوقع أن يرجّع الخادم بيانات المستخدم (الرصيد، إلخ) من Firestore
-  const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/auth/verify`, {
+function todayKey() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+}
+
+// =========================================================
+// توليد كود إحالة قصير وفريد (6 محارف، بدون رموز ملتبسة زي 0/O أو 1/l/I)
+// ========================================================
+const REF_CODE_CHARS = "23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ";
+function generateReferralCode(length = 6) {
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += REF_CODE_CHARS[crypto.randomInt(REF_CODE_CHARS.length)];
+  }
+  return code;
+}
+
+async function createUniqueReferralCode() {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = generateReferralCode();
+    const doc = await db.collection("referralCodes").doc(code).get();
+    if (!doc.exists) return code;
+  }
+  throw new Error("could not generate unique referral code");
+}
+
+// =========================================================
+// POST /api/auth/verify
+// يتحقق من initData وينشئ مستند المستخدم إذا ما كان موجود
+// =========================================================
+app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const ref = db.collection("users").doc(userId);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      const myCode = await createUniqueReferralCode();
+
+      // إذا فتح هذا المستخدم البوت عبر رابط إحالة (مسجل مسبقًا وقت /start)
+      let referrerId = null;
+      const pendingRef = await db.collection("pendingReferrals").doc(userId).get();
+      if (pendingRef.exists) {
+        const candidateReferrer = pendingRef.data().referrerId;
+        if (candidateReferrer && candidateReferrer !== userId) {
+          referrerId = candidateReferrer;
+        }
+      }
+
+      await db.runTransaction(async (tx) => {
+        tx.set(ref, {
+          firstName: req.tgUser.first_name || "",
+          username: req.tgUser.username || "",
+          balance: 0,
+          viewsToday: 0,
+          totalViews: 0,
+          lastViewDate: todayKey(),
+          referredBy: referrerId,
+          referralCode: myCode,
+          referralCount: 0,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        tx.set(db.collection("referralCodes").doc(myCode), { userId });
+
+        if (referrerId) {
+          const referralDocRef = db.collection("referrals").doc();
+          tx.set(referralDocRef, {
+            referrerId,
+            refereeId: userId,
+            refereeName: req.tgUser.first_name || "",
+            refereeUsername: req.tgUser.username || "",
+            status: "active", // نشطة فورًا لأنه هذا الاستدعاء بحد ذاته يعني المستخدم فتح التطبيق فعليًا
+            rewardClaimed: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          tx.update(db.collection("users").doc(referrerId), {
+            referralCount: admin.firestore.FieldValue.increment(1),
+          });
+        }
+      });
+
+      if (pendingRef.exists) {
+        await db.collection("pendingReferrals").doc(userId).delete();
+      }
+
+      if (referrerId) {
+        const notif =
+          `A referral has been confirmed and is now Active!\n\n` +
+          `Name: ${req.tgUser.first_name || "N/A"}\n` +
+          `Username: ${req.tgUser.username ? "@" + req.tgUser.username : "N/A"}\n` +
+          `Telegram ID: ${userId}\n\n` +
+          `Go to the Friends section and claim your reward.`;
+        await sendTelegramMessage(referrerId, notif);
+      }
+    } else if (!doc.data().referralCode) {
+      // مستخدم قديم أُنشئ قبل إضافة نظام الإحالة — نولّد له كود الآن
+      const myCode = await createUniqueReferralCode();
+      await db.runTransaction(async (tx) => {
+        tx.update(ref, { referralCode: myCode, referralCount: doc.data().referralCount || 0 });
+        tx.set(db.collection("referralCodes").doc(myCode), { userId });
+      });
+    }
+
+    const fresh = await ref.get();
+    res.json({ ok: true, user: fresh.data() });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// =========================================================
+// POST /api/ads/confirm
+// ⚠️ هذا endpoint مؤقت للتطوير. بالنشر الفعلي، يُستحسن استبداله
+// أو تعزيزه بـ Reward Postback URL من AdsGram (server-to-server)
+// حتى لا يعتمد منح المكافأة على حدث المتصفح فقط.
+// =========================================================
+app.post("/api/ads/confirm", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const ref = db.collection("users").doc(userId);
+
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      if (!doc.exists) throw new Error("user not found");
+      const data = doc.data();
+
+      // إعادة تصفير العداد اليومي إذا تغير اليوم
+      const today = todayKey();
+      let viewsToday = data.viewsToday || 0;
+      if (data.lastViewDate !== today) viewsToday = 0;
+
+      if (viewsToday >= DAILY_AD_LIMIT) {
+        throw new Error("daily limit reached");
+      }
+
+      tx.update(ref, {
+        balance: admin.firestore.FieldValue.increment(REWARD_PER_AD),
+        viewsToday: viewsToday + 1,
+        totalViews: admin.firestore.FieldValue.increment(1),
+        lastViewDate: today,
+      });
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(400).json({ error: e.message || "could not confirm ad view" });
+  }
+});
+
+// =========================================================
+// POST /api/withdraw/request
+// ينشئ طلب سحب بحالة "pending" فقط — لا تحويل تلقائي هنا.
+// التنفيذ الفعلي (إرسال TON) يجب أن يتم يدويًا أو بمنطق منفصل
+// تراجعه بنفسك قبل التنفيذ.
+// =========================================================
+app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const { wallet, amount } = req.body;
+
+    if (!wallet || typeof wallet !== "string") {
+      return res.status(400).json({ error: "invalid wallet address" });
+    }
+    const amt = parseFloat(amount);
+    if (!amt || amt < MIN_WITHDRAW) {
+      return res.status(400).json({ error: `minimum withdraw is ${MIN_WITHDRAW} TON` });
+    }
+
+    const userRef = db.collection("users").doc(userId);
+
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(userRef);
+      if (!doc.exists) throw new Error("user not found");
+      const balance = doc.data().balance || 0;
+      if (amt > balance) throw new Error("insufficient balance");
+
+      // خصم فوري لمنع طلبات سحب مكررة لنفس الرصيد
+      tx.update(userRef, { balance: admin.firestore.FieldValue.increment(-amt) });
+
+      const withdrawRef = db.collection("withdrawals").doc();
+      tx.set(withdrawRef, {
+        userId,
+        wallet,
+        amount: amt,
+        status: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    res.json({ ok: true, message: "withdraw request submitted" });
+  } catch (e) {
+    console.error(e);
+    res.status(400).json({ error: e.message || "could not submit withdraw request" });
+  }
+});
+
+// =========================================================
+// POST /api/telegram/webhook
+// يستقبل تحديثات البوت من تيليجرام (رسائل، أوامر). عند /start
+// يرد بزر يفتح الـ Web App.
+// =========================================================
+async function sendTelegramMessage(chatId, text, replyMarkup) {
+  await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ initData: tg?.initData || "" }),
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      reply_markup: replyMarkup,
+    }),
   });
-  if (!res.ok) throw new Error("session verification failed");
-  return res.json();
 }
 
-/* =========================================================
-   4) Splash / Loading — خطوات تحضير حقيقية، بدون تأخير مصطنع
-   ========================================================= */
-async function runSplashSequence() {
-  const fill = document.getElementById("splashBarFill");
-  const status = document.getElementById("splashStatus");
-  const steps = [
-    { pct: 20, label: "تحميل واجهة تيليجرام…", fn: initTelegram },
-    { pct: 50, label: "الاتصال بـ Firebase…", fn: initFirebase },
-    { pct: 85, label: "التحقق من الجلسة…", fn: async () => {
-        try { await verifySessionOnServer(); }
-        catch (e) { console.warn("verify skipped (backend not configured yet)", e); }
+app.post("/api/telegram/webhook", async (req, res) => {
+  // تحقق أن الطلب فعليًا من تيليجرام (Secret Token الذي تضبطه أنت عند تسجيل الـ webhook)
+  if (TELEGRAM_WEBHOOK_SECRET) {
+    const incomingSecret = req.headers["x-telegram-bot-api-secret-token"];
+    if (incomingSecret !== TELEGRAM_WEBHOOK_SECRET) {
+      return res.sendStatus(401);
+    }
+  }
+
+  try {
+    const update = req.body;
+    const message = update.message;
+    if (message && message.text) {
+      const chatId = message.chat.id;
+      const text = message.text.trim();
+
+      if (text.startsWith("/start")) {
+        const parts = text.split(" ");
+        const payload = parts.length > 1 ? parts[1].trim() : null;
+
+        if (payload) {
+          try {
+            const codeDoc = await db.collection("referralCodes").doc(payload).get();
+            if (codeDoc.exists) {
+              const referrerId = codeDoc.data().userId;
+              if (referrerId !== String(chatId)) {
+                // يُخزَّن مؤقتًا؛ يتحول لإحالة "نشطة" فقط عند أول فتح فعلي للتطبيق (/api/auth/verify)
+                await db.collection("pendingReferrals").doc(String(chatId)).set({
+                  referrerId,
+                  code: payload,
+                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+            }
+          } catch (e) {
+            console.error("referral payload error", e);
+          }
+        }
+
+        await sendTelegramMessage(
+          chatId,
+          "Welcome to TapEarn.\nWatch ads, earn TON, and withdraw straight to your wallet. Tap below to get started.",
+          {
+            inline_keyboard: [[{ text: "Open App", web_app: { url: WEBAPP_URL } }]],
+          }
+        );
       }
-    },
-    { pct: 100, label: "جاهز", fn: async () => {} },
-  ];
-  for (const step of steps) {
-    status.textContent = step.label;
-    await step.fn();
-    fill.style.width = step.pct + "%";
-    await new Promise(r => setTimeout(r, 120)); // فقط لسلاسة الحركة، ليس تأخيرًا اصطناعيًا
-  }
-  document.getElementById("splash").classList.add("hidden");
-}
-
-/* =========================================================
-   5) Tabs
-   ========================================================= */
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    tab.classList.add("active");
-    document.getElementById(tab.dataset.view).classList.add("active");
-    tg?.HapticFeedback?.selectionChanged();
-  });
-});
-
-/* =========================================================
-   6) Toast
-   ========================================================= */
-function showToast(msg) {
-  const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.classList.add("show");
-  clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => el.classList.remove("show"), 2200);
-}
-
-/* =========================================================
-   7) حالة التطبيق — تُملأ لاحقًا من Firestore عبر الخادم
-   ========================================================= */
-let state = { balance: 0, viewsToday: 0, totalViews: 0 };
-
-function renderBalance() {
-  document.getElementById("balanceValue").textContent = state.balance.toFixed(3);
-  document.getElementById("withdrawableBalance").textContent = state.balance.toFixed(3) + " TON";
-  document.getElementById("statToday").textContent = (state.viewsToday * CONFIG.REWARD_PER_AD).toFixed(3) + " TON";
-  document.getElementById("statViews").textContent = state.totalViews;
-  const left = Math.max(0, CONFIG.DAILY_AD_LIMIT - state.viewsToday);
-  document.getElementById("statLeft").textContent = left;
-  document.getElementById("progressLabel").textContent = `${state.viewsToday} / ${CONFIG.DAILY_AD_LIMIT} مشاهدة اليوم`;
-  document.getElementById("orbRing").style.setProperty("--progress", Math.min(100, (state.viewsToday / CONFIG.DAILY_AD_LIMIT) * 100));
-  document.getElementById("orbBtn").disabled = left <= 0;
-}
-
-/* =========================================================
-   8) الاستماع لتحديثات الرصيد من Firestore (بعد التحقق من initData بالخادم)
-   يُفترض أن الخادم هو من يكتب على المستند — لا كتابة مباشرة من الكلاينت
-   ========================================================= */
-function listenToUserDoc() {
-  if (!db || !tgUser) return;
-  db.collection("users").doc(String(tgUser.id))
-    .onSnapshot(doc => {
-      if (!doc.exists) return;
-      const d = doc.data();
-      state.balance = d.balance || 0;
-      state.viewsToday = d.viewsToday || 0;
-      state.totalViews = d.totalViews || 0;
-      renderBalance();
-    }, err => console.warn("Firestore listen error", err));
-}
-
-/* =========================================================
-   9) AdsGram — عرض إعلان مكافأة
-   ========================================================= */
-let AdController = null;
-function initAds() {
-  try {
-    AdController = window.Adsgram?.init({ blockId: CONFIG.ADSGRAM_BLOCK_ID });
-  } catch (e) {
-    console.warn("Adsgram init failed", e);
-  }
-}
-
-function burstCoins() {
-  const wrap = document.getElementById("burst");
-  for (let i = 0; i < 10; i++) {
-    const s = document.createElement("div");
-    s.className = "spark";
-    const angle = (Math.PI * 2 * i) / 10;
-    const dist = 70 + Math.random() * 20;
-    s.animate([
-      { transform: "translate(-50%,-50%) scale(1)", opacity: 1 },
-      { transform: `translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(0)`, opacity: 0 }
-    ], { duration: 650, easing: "ease-out" });
-    wrap.appendChild(s);
-    setTimeout(() => s.remove(), 650);
-  }
-}
-
-async function confirmAdViewOnServer() {
-  // ⚠️ لا تعتمد على هذا وحده لمنح المكافأة. الاعتماد الفعلي يجب أن يكون
-  // عبر Reward Postback URL من AdsGram إلى خادمك (server-to-server).
-  // هذا النداء فقط يُعلم الخادم أن العرض انتهى من جهة الكلاينت لتحديث الواجهة الأولي.
-  const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/ads/confirm`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-    body: JSON.stringify({ blockId: CONFIG.ADSGRAM_BLOCK_ID }),
-  });
-  if (!res.ok) throw new Error("ad confirmation failed");
-  return res.json();
-}
-
-document.getElementById("orbBtn").addEventListener("click", async () => {
-  if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) { showToast("وصلت للحد الأقصى اليوم"); return; }
-  if (!AdController) { showToast("الإعلانات غير متاحة حاليًا"); return; }
-  try {
-    await AdController.show();
-    await confirmAdViewOnServer();
-    // الرصيد المعروض سيتحدث فعليًا عبر Firestore listener بعد تأكيد الخادم
-    burstCoins();
-    tg?.HapticFeedback?.notificationOccurred("success");
-  } catch (e) {
-    console.warn("Ad flow error", e);
-    showToast("لم تكتمل مشاهدة الإعلان");
-  }
-});
-
-/* =========================================================
-   10) الإحالات — مرتبطة فعليًا بالخادم/Firestore، لا بيانات وهمية
-   ========================================================= */
-let currentReferralLink = "";
-
-async function loadReferrals() {
-  try {
-    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/list`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-      body: JSON.stringify({}),
-    });
-    if (!res.ok) throw new Error("failed to load referrals");
-    const data = await res.json();
-
-    currentReferralLink = data.referralLink || "";
-    document.getElementById("refLink").textContent = currentReferralLink
-      ? currentReferralLink.replace("https://", "")
-      : "غير متاح حاليًا";
-    document.getElementById("refCount").textContent = data.referralCount || 0;
-    document.getElementById("refRewardRate").textContent = data.rewardPerReferral.toFixed(3) + " TON";
-    document.getElementById("refUnclaimed").textContent = data.unclaimedReward.toFixed(3) + " TON";
-    document.getElementById("claimRefBtn").disabled = !(data.unclaimedReward > 0);
-
-    const listCard = document.getElementById("refListCard");
-    if (!data.referrals || data.referrals.length === 0) {
-      listCard.innerHTML = '<div class="empty" id="refEmpty">لا يوجد أصدقاء مدعوّين بعد. شارك رابطك لتبدأ بالربح.</div>';
-    } else {
-      listCard.innerHTML = data.referrals.map(r => `
-        <div class="row">
-          <span class="k">${r.username ? "@" + r.username : (r.name || "مستخدم")}</span>
-          <span class="v">${r.rewardClaimed ? "تم الاستلام" : (r.status === "active" ? "نشطة" : "قيد الانتظار")}</span>
-        </div>
-      `).join("");
     }
+    res.sendStatus(200); // لازم ترد 200 دائمًا، وإلا تيليجرام بيعيد المحاولة بشكل متكرر
   } catch (e) {
-    console.warn("loadReferrals error", e);
+    console.error("webhook error", e);
+    res.sendStatus(200);
   }
-}
+});
 
-document.getElementById("copyRefBtn").addEventListener("click", () => {
-  if (!currentReferralLink) { showToast("الرابط غير جاهز بعد"); return; }
-  navigator.clipboard?.writeText(currentReferralLink).then(() => showToast("تم نسخ الرابط"));
-});
-document.getElementById("shareRefBtn").addEventListener("click", () => {
-  if (!currentReferralLink) { showToast("الرابط غير جاهز بعد"); return; }
-  tg?.openTelegramLink?.(`https://t.me/share/url?url=${encodeURIComponent(currentReferralLink)}`);
-});
-document.getElementById("claimRefBtn").addEventListener("click", async () => {
+// =========================================================
+// POST /api/referrals/list
+// يرجّع كود/رابط الإحالة الخاص بالمستخدم، وقائمة إحالاته، والمكافآت غير المطالب بها
+// =========================================================
+app.post("/api/referrals/list", requireTelegramAuth, async (req, res) => {
   try {
-    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/claim`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-      body: JSON.stringify({}),
+    const userId = String(req.tgUser.id);
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return res.status(404).json({ error: "user not found" });
+    const userData = userDoc.data();
+
+    const snap = await db.collection("referrals").where("referrerId", "==", userId).get();
+    const referrals = [];
+    let unclaimedCount = 0;
+    snap.forEach((d) => {
+      const r = d.data();
+      referrals.push({
+        id: d.id,
+        name: r.refereeName,
+        username: r.refereeUsername,
+        status: r.status,
+        rewardClaimed: r.rewardClaimed,
+      });
+      if (r.status === "active" && !r.rewardClaimed) unclaimedCount++;
     });
-    if (!res.ok) throw new Error("claim failed");
-    const data = await res.json();
-    if (data.claimed > 0) {
-      showToast(`تم استلام ${data.amount.toFixed(3)} TON من ${data.claimed} إحالة`);
-      loadReferrals();
-    } else {
-      showToast("لا يوجد مكافآت متاحة حاليًا");
+
+    res.json({
+      ok: true,
+      referralCode: userData.referralCode || null,
+      referralLink: userData.referralCode ? `https://t.me/${BOT_USERNAME}?start=${userData.referralCode}` : null,
+      referralCount: userData.referralCount || 0,
+      referrals,
+      unclaimedReward: +(unclaimedCount * REFERRAL_REWARD).toFixed(6),
+      rewardPerReferral: REFERRAL_REWARD,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// =========================================================
+// POST /api/referrals/claim
+// يجمع كل الإحالات النشطة غير المُطالَب بمكافأتها ويضيفها للرصيد دفعة واحدة
+// =========================================================
+app.post("/api/referrals/claim", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const snap = await db
+      .collection("referrals")
+      .where("referrerId", "==", userId)
+      .where("status", "==", "active")
+      .where("rewardClaimed", "==", false)
+      .get();
+
+    if (snap.empty) {
+      return res.json({ ok: true, claimed: 0, amount: 0 });
     }
-  } catch (e) {
-    console.warn(e);
-    showToast("تعذر استلام المكافأة");
-  }
-});
-// تحديث القائمة عند فتح تبويب الإحالات
-document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", loadReferrals);
 
-/* =========================================================
-   11) السحب — الكلاينت لا يوقّع أي معاملة، فقط يرسل طلب للخادم
-   ========================================================= */
-document.getElementById("withdrawBtn").addEventListener("click", async () => {
-  const wallet = document.getElementById("tonWallet").value.trim();
-  const amount = parseFloat(document.getElementById("withdrawAmount").value);
-  if (!wallet) { showToast("أدخل عنوان محفظة صالح"); return; }
-  if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`الحد الأدنى للسحب ${CONFIG.MIN_WITHDRAW} TON`); return; }
-  if (amount > state.balance) { showToast("الرصيد غير كافٍ"); return; }
-  try {
-    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/withdraw/request`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-      body: JSON.stringify({ wallet, amount }),
+    const amount = +(snap.size * REFERRAL_REWARD).toFixed(6);
+    const userRef = db.collection("users").doc(userId);
+
+    await db.runTransaction(async (tx) => {
+      const docs = await Promise.all(snap.docs.map((d) => tx.get(d.ref)));
+      docs.forEach((d) => tx.update(d.ref, { rewardClaimed: true }));
+      tx.update(userRef, { balance: admin.firestore.FieldValue.increment(amount) });
     });
-    if (!res.ok) throw new Error("withdraw request failed");
-    showToast("تم إرسال طلب السحب للمراجعة");
+
+    res.json({ ok: true, claimed: snap.size, amount });
   } catch (e) {
-    console.warn(e);
-    showToast("تعذر إرسال الطلب، حاول لاحقًا");
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
   }
 });
 
-/* =========================================================
-   12) نقطة الانطلاق
-   ========================================================= */
-window.addEventListener("DOMContentLoaded", async () => {
-  await runSplashSequence();
-  initAds();
-  listenToUserDoc();
-  renderBalance();
-  loadReferrals();
-});
-</script>
-</body>
-</html>
+// ---------- health check ----------
+app.get("/", (req, res) => res.send("TapEarn backend is running."));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

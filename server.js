@@ -313,6 +313,24 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
   });
 }
 
+async function sendTelegramPhoto(chatId, photoUrl, caption, replyMarkup) {
+  const res = await fetch(`${TELEGRAM_API}/sendPhoto`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      photo: photoUrl,
+      caption,
+      reply_markup: replyMarkup,
+    }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    console.error("sendPhoto failed, falling back to text:", data.description);
+    await sendTelegramMessage(chatId, caption, replyMarkup);
+  }
+}
+
 app.post("/api/telegram/webhook", async (req, res) => {
   // تحقق أن الطلب فعليًا من تيليجرام (Secret Token الذي تضبطه أنت عند تسجيل الـ webhook)
   if (TELEGRAM_WEBHOOK_SECRET) {
@@ -352,8 +370,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
           }
         }
 
-        await sendTelegramMessage(
+        await sendTelegramPhoto(
           chatId,
+          `${WEBAPP_URL}assets/logo_1.png`,
           "Welcome to TapEarn.\nWatch ads, earn TON, and withdraw straight to your wallet. Tap below to get started.",
           {
             inline_keyboard: [[{ text: "Open App", web_app: { url: WEBAPP_URL } }]],

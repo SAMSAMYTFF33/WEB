@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>TapEarn — اربح TON من مشاهدة الإعلانات</title>
+<link rel="icon" type="image/png" href="assets/favicon_128.png">
+<link rel="apple-touch-icon" href="assets/logo_512.png">
+<meta property="og:title" content="TapEarn">
+<meta property="og:description" content="اربح TON من مشاهدة الإعلانات">
+<meta property="og:image" content="assets/logo_512.png">
 
 <!-- Telegram WebApp SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -448,8 +453,15 @@ document.querySelectorAll(".tab").forEach(tab => {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     tab.classList.add("active");
     document.getElementById(tab.dataset.view).classList.add("active");
+    playClickSound();
     tg?.HapticFeedback?.selectionChanged();
   });
+});
+
+/* نقرة خفيفة موحّدة لكل الأزرار (.btn) بدون تكرار الكود بكل معالج */
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".btn");
+  if (btn && !btn.disabled) playClickSound();
 });
 
 /* =========================================================
@@ -461,6 +473,50 @@ function showToast(msg) {
   el.classList.add("show");
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+/* =========================================================
+   6b) أصوات — مولّدة برمجيًا عبر Web Audio API (لا ملفات خارجية)
+   ========================================================= */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) audioCtx = new Ctx();
+  }
+  return audioCtx;
+}
+function playTone(freq, startTime, duration, gainPeak = 0.18, type = "sine") {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.02);
+}
+function playCoinSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  playTone(880, now, 0.12, 0.16);
+  playTone(1318.5, now + 0.06, 0.16, 0.14);
+}
+function playClaimSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  [659.25, 830.6, 987.77, 1318.5].forEach((f, i) => playTone(f, now + i * 0.07, 0.18, 0.13));
+}
+function playClickSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  playTone(520, ctx.currentTime, 0.045, 0.07, "triangle");
 }
 
 /* =========================================================
@@ -541,6 +597,7 @@ document.getElementById("orbBtn").addEventListener("click", async () => {
     await AdController.show();
     await confirmAdViewOnServer();
     burstCoins();
+    playCoinSound();
     tg?.HapticFeedback?.notificationOccurred("success");
   } catch (e) {
     console.warn("Ad flow error", e);
@@ -611,6 +668,7 @@ document.getElementById("claimRefBtn").addEventListener("click", async () => {
     const data = await res.json();
     if (data.claimed > 0) {
       showToast(`تم استلام ${data.amount.toFixed(3)} TON من ${data.claimed} إحالة`);
+      playClaimSound();
       loadReferrals();
     } else {
       showToast("لا يوجد مكافآت متاحة حاليًا");

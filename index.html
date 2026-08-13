@@ -1,249 +1,264 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>TapEarn — اربح TON من مشاهدة الإعلانات</title>
+<title>TapEarn — Earn TON by Watching Ads</title>
 <link rel="icon" type="image/png" href="assets/favicon_128.png">
 <link rel="apple-touch-icon" href="assets/logo_512.png">
 <meta property="og:title" content="TapEarn">
-<meta property="og:description" content="اربح TON من مشاهدة الإعلانات">
+<meta property="og:description" content="Earn TON by watching ads">
 <meta property="og:image" content="assets/logo_512.png">
-
 <!-- Telegram WebApp SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
 <!-- AdsGram SDK -->
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
-
-<!-- Firebase (compat build — أبسط للدمج بدون bundler) -->
+<!-- Firebase (compat build) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-
 <style>
-  :root{
-    /* ===== Palette — graphite / brushed brass / steel blue ===== */
-    --bg:#0a0d12;
-    --bg-grad:#0d1117;
-    --surface:#12161d;
-    --surface-2:#171c25;
-    --surface-3:#1c222c;
-    --border:rgba(255,255,255,.055);
-    --border-strong:rgba(255,255,255,.11);
-    --text:#eef1f5;
-    --text-dim:#a7b0bd;
-    --text-muted:#647085;
-    --accent:#4a94c9;
-    --accent-dim:#2c5877;
-    --brass:#c6a25c;
-    --brass-2:#e2c583;
-    --success:#4e9d78;
-    --success-bg:rgba(78,157,120,.12);
-    --danger:#c96a5f;
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
-  html,body{ height:100%; background:var(--bg); color:var(--text); font-family:'Tajawal', -apple-system, system-ui, sans-serif; overscroll-behavior:none; }
-  body{
-    display:flex; flex-direction:column; min-height:100vh;
-    font-variant-numeric: tabular-nums;
-    background:
-      radial-gradient(900px 500px at 50% -10%, rgba(74,148,201,.08), transparent 60%),
-      var(--bg);
-  }
-  ::-webkit-scrollbar{ display:none; }
-  .mono{ font-family:'IBM Plex Mono', monospace; }
+:root{
+  /* ===== Palette — graphite / brushed brass / steel blue ===== */
+  --bg:#0a0d12;
+  --bg-grad:#0d1117;
+  --surface:#12161d;
+  --surface-2:#171c25;
+  --surface-3:#1c222c;
+  --border:rgba(255,255,255,.055);
+  --border-strong:rgba(255,255,255,.11);
+  --text:#eef1f5;
+  --text-dim:#a7b0bd;
+  --text-muted:#647085;
+  --accent:#4a94c9;
+  --accent-dim:#2c5877;
+  --brass:#c6a25c;
+  --brass-2:#e2c583;
+  --success:#4e9d78;
+  --success-bg:rgba(78,157,120,.12);
+  --danger:#c96a5f;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+html,body{ height:100%; background:var(--bg); color:var(--text); font-family:'Tajawal', -apple-system, system-ui, sans-serif; overscroll-behavior:none; }
+body{
+  display:flex; flex-direction:column; min-height:100vh;
+  font-variant-numeric: tabular-nums;
+  background:
+    radial-gradient(900px 500px at 50% -10%, rgba(74,148,201,.08), transparent 60%),
+    var(--bg);
+}
+::-webkit-scrollbar{ display:none; }
+.mono{ font-family:'IBM Plex Mono', monospace; }
 
-  /* ===== Splash ===== */
-  #splash{
-    position:fixed; inset:0; z-index:100;
-    background: radial-gradient(circle at 50% 28%, #101722, var(--bg) 72%);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
-    transition: opacity .4s ease, visibility .4s ease;
-  }
-  #splash.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
-  .splash-mark{ width:56px; height:56px; }
-  .splash-title{ font-weight:800; font-size:15px; letter-spacing:4px; color:var(--text-dim); text-transform:uppercase; }
-  .splash-bar-track{ width:160px; height:2px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
-  .splash-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--brass)); transition:width .3s ease; }
-  .splash-status{ font-size:11.5px; color:var(--text-muted); min-height:16px; letter-spacing:.2px; }
+/* ===== Splash ===== */
+#splash{
+  position:fixed; inset:0; z-index:100;
+  background: radial-gradient(circle at 50% 28%, #101722, var(--bg) 72%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+  transition: opacity .4s ease, visibility .4s ease;
+}
+#splash.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
 
-  /* ===== Header ===== */
-  header{
-    padding: calc(16px + var(--safe-top)) 18px 16px;
-    background: linear-gradient(180deg, #0c1016 0%, var(--bg) 100%);
-    border-bottom: 1px solid var(--border);
-    position: sticky; top:0; z-index:10;
-  }
-  .header-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-  .brand{ display:flex; align-items:center; gap:9px; }
-  .brand-mark{ width:26px; height:26px; }
-  .brand span{ font-weight:800; font-size:14.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text); }
-  .avatar{
-    width:32px; height:32px; border-radius:9px;
-    background: var(--surface-2); border:1px solid var(--border-strong);
-    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--text-dim);
-  }
-  .balance-card{
-    position:relative; overflow:hidden;
-    background: linear-gradient(160deg, var(--surface-2), var(--surface));
-    border:1px solid var(--border); border-radius:16px; padding:18px 20px;
-    display:flex; align-items:center; justify-content:space-between;
-  }
-  .balance-card::before{
-    content:""; position:absolute; inset-inline-end:-40px; top:-40px; width:140px; height:140px; border-radius:50%;
-    background: radial-gradient(circle, rgba(198,162,92,.10), transparent 70%);
-  }
-  .balance-label{ font-size:11px; color:var(--text-muted); margin-bottom:8px; letter-spacing:.3px; }
-  .balance-value{ font-size:27px; font-weight:800; display:flex; align-items:baseline; gap:7px; letter-spacing:-.3px; }
-  .balance-value .unit{ font-size:12px; color:var(--brass); font-weight:700; letter-spacing:.5px; }
-  .balance-usd{ font-size:11px; color:var(--text-muted); margin-top:6px; }
-  .coin-icon{ width:42px; height:42px; position:relative; z-index:1; }
+/* Logo — circular frame */
+.splash-mark{
+  width:80px; height:80px; border-radius:50%;
+  overflow:hidden; display:flex; align-items:center; justify-content:center;
+  background: var(--surface-2);
+  border:2px solid transparent;
+  background-image: linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
+  background-origin: border-box;
+  background-clip: content-box, border-box;
+  box-shadow: 0 0 0 1px var(--border-strong), 0 8px 24px rgba(0,0,0,.35);
+}
+.splash-mark img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
 
-  main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
-  .view{ display:none; animation: fadein .3s ease; }
-  .view.active{ display:block; }
-  @keyframes fadein{ from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);} }
-  .section-title{
-    font-size:11.5px; font-weight:800; color:var(--text-muted); margin: 26px 0 12px;
-    letter-spacing:1px; text-transform:uppercase; display:flex; align-items:center; gap:8px;
-  }
-  .section-title::after{ content:""; flex:1; height:1px; background:var(--border); }
-  .section-title:first-child{ margin-top:0; }
+.splash-title{ font-weight:800; font-size:15px; letter-spacing:4px; color:var(--text-dim); text-transform:uppercase; }
+.splash-bar-track{ width:160px; height:2px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+.splash-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--brass)); transition:width .3s ease; }
+.splash-status{ font-size:11.5px; color:var(--text-muted); min-height:16px; letter-spacing:.2px; }
 
-  /* ===== Ad dial (formerly "orb") ===== */
-  .dial-wrap{ display:flex; flex-direction:column; align-items:center; padding: 10px 0 4px; }
-  .dial{ position:relative; width:184px; height:184px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; border:none; background:none; }
-  .dial-ring{
-    position:absolute; inset:0; border-radius:50%;
-    background: conic-gradient(var(--brass) calc(var(--progress, 0) * 1%), rgba(255,255,255,.06) 0);
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-    transition: background .8s ease;
-  }
-  .dial-core{
-    position:relative; width:154px; height:154px; border-radius:50%;
-    background: linear-gradient(160deg, var(--surface-2), #0e1218 75%);
-    border:1px solid var(--border-strong);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
-    transition: transform .12s ease;
-  }
-  .dial:active .dial-core{ transform: scale(.97); }
-  .dial-core .play-icon{ width:26px; height:26px; color:var(--brass); }
-  .dial-core .cta{ font-size:12.5px; font-weight:700; letter-spacing:.2px; color:var(--text); }
-  .dial-core .sub{ font-size:11px; color:var(--text-muted); }
-  .dial-core .sub b{ color:var(--brass-2); font-weight:700; }
-  .dial-progress-label{ margin-top:16px; font-size:12px; color:var(--text-muted); letter-spacing:.2px; }
-  .burst{ position:absolute; inset:0; pointer-events:none; }
-  .spark{ position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%; background: var(--brass-2); opacity:0; }
+/* ===== Header ===== */
+header{
+  padding: calc(16px + var(--safe-top)) 18px 16px;
+  background: linear-gradient(180deg, #0c1016 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top:0; z-index:10;
+}
+.header-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.brand{ display:flex; align-items:center; gap:9px; }
 
-  .card{ background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:11px; }
-  .row{ display:flex; align-items:center; justify-content:space-between; }
-  .row + .row{ margin-top:11px; padding-top:11px; border-top:1px solid var(--border); }
-  .row .k{ font-size:12.5px; color:var(--text-muted); }
-  .row .v{ font-size:13.5px; font-weight:700; letter-spacing:.1px; }
-  .btn{
-    display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px;
-    border-radius:12px; border:1px solid transparent; font-family:inherit; font-size:13.5px; font-weight:700;
-    cursor:pointer; color:var(--text); letter-spacing:.1px; transition: filter .15s ease, transform .1s ease;
-  }
-  .btn:active{ transform: scale(.99); }
-  .btn-primary{ background: var(--accent); color:#08131c; }
-  .btn-primary:active{ filter:brightness(.94); }
-  .btn-ton{ background: var(--brass); color:#1a1206; }
-  .btn-ton:active{ filter:brightness(.94); }
-  .btn-ghost{ background: var(--surface-2); color:var(--text-dim); border:1px solid var(--border-strong); }
-  .btn[disabled]{ opacity:.4; pointer-events:none; }
-  .input{
-    width:100%; padding:13px 14px; border-radius:10px; background: var(--surface-2);
-    border:1px solid var(--border-strong); color:var(--text); font-family:inherit; font-size:13.5px; margin-bottom:10px;
-  }
-  .input::placeholder{ color:var(--text-muted); }
-  .input:focus{ outline:none; border-color:var(--accent-dim); }
-  .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.75; margin-top:8px; padding-inline-start:12px; border-inline-start:2px solid var(--border-strong); }
-  .hint.warn{ border-inline-start-color: var(--brass); color:#b7ac93; }
-  .ref-link{
-    display:flex; align-items:center; gap:8px; background: var(--surface-2); border:1px solid var(--border-strong);
-    border-radius:10px; padding:13px 14px; font-size:12px; color:var(--text-dim); direction:ltr; text-align:left;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .empty{ text-align:center; padding:28px 10px; color:var(--text-muted); font-size:12.5px; line-height:1.7; }
-  .mining-card{ background: linear-gradient(160deg, #131b17, var(--surface)); border-color: rgba(78,157,120,.16); }
-  .rate-pill{
-    display:inline-flex; align-items:center; gap:6px; background: var(--success-bg); color:#8fd0ac;
-    padding:5px 11px; border-radius:8px; font-size:11px; font-weight:700; letter-spacing:.2px;
-  }
-  .rate-pill svg{ width:12px; height:12px; }
+/* Header logo — circular frame */
+.brand-mark{
+  width:30px; height:30px; border-radius:50%;
+  overflow:hidden; flex-shrink:0;
+  background: var(--surface-2);
+  border:1.5px solid transparent;
+  background-image: linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
+  background-origin: border-box;
+  background-clip: content-box, border-box;
+}
+.brand-mark img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
 
-  .friend-row{
-    display:flex; align-items:center; justify-content:space-between; padding:11px 0;
-  }
-  .friend-row + .friend-row{ border-top:1px solid var(--border); }
-  .friend-name{ font-size:12.5px; font-weight:700; color:var(--text); }
-  .friend-status{ font-size:11px; font-weight:700; padding:4px 9px; border-radius:7px; letter-spacing:.2px; }
-  .friend-status.active{ background: var(--success-bg); color:#8fd0ac; }
-  .friend-status.claimed{ background: var(--surface-2); color:var(--text-muted); }
-  .friend-status.pending{ background: rgba(198,162,92,.12); color:var(--brass-2); }
+.brand span{ font-weight:800; font-size:14.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text); }
+.avatar{
+  width:32px; height:32px; border-radius:9px;
+  background: var(--surface-2); border:1px solid var(--border-strong);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--text-dim);
+}
+.balance-card{
+  position:relative; overflow:hidden;
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  border:1px solid var(--border); border-radius:16px; padding:18px 20px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.balance-card::before{
+  content:""; position:absolute; inset-inline-end:-40px; top:-40px; width:140px; height:140px; border-radius:50%;
+  background: radial-gradient(circle, rgba(198,162,92,.10), transparent 70%);
+}
+.balance-label{ font-size:11px; color:var(--text-muted); margin-bottom:8px; letter-spacing:.3px; }
+.balance-value{ font-size:27px; font-weight:800; display:flex; align-items:baseline; gap:7px; letter-spacing:-.3px; }
+.balance-value .unit{ font-size:12px; color:var(--brass); font-weight:700; letter-spacing:.5px; }
+.balance-usd{ font-size:11px; color:var(--text-muted); margin-top:6px; }
+.coin-icon{ width:42px; height:42px; position:relative; z-index:1; }
 
-  nav{
-    position:fixed; bottom:0; left:0; right:0; background: rgba(10,13,18,.94); backdrop-filter: blur(16px);
-    border-top:1px solid var(--border); padding: 9px 12px calc(9px + var(--safe-bottom)); display:flex; gap:2px; z-index:20;
-  }
-  .tab{
-    flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none;
-    color:var(--text-muted); font-family:inherit; padding:7px 2px 9px; border-radius:10px; cursor:pointer; position:relative;
-  }
-  .tab svg{ width:20px; height:20px; }
-  .tab span{ font-size:10px; font-weight:700; letter-spacing:.2px; }
-  .tab.active{ color:var(--text); }
-  .tab.active::after{
-    content:""; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
-    width:16px; height:2px; border-radius:2px; background:var(--brass);
-  }
+main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
+.view{ display:none; animation: fadein .3s ease; }
+.view.active{ display:block; }
+@keyframes fadein{ from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);} }
 
-  .toast{
-    position:fixed; top: calc(12px + var(--safe-top)); left:50%; transform:translateX(-50%) translateY(-140%);
-    background:var(--surface-3); border:1px solid var(--border-strong); color:var(--text); padding:11px 18px;
-    border-radius:10px; font-size:12.5px; font-weight:700; z-index:50; transition: transform .3s cubic-bezier(.2,.8,.2,1);
-    box-shadow:0 10px 30px rgba(0,0,0,.4); white-space:nowrap;
-  }
-  .toast.show{ transform:translateX(-50%) translateY(0); }
+.section-title{
+  font-size:11.5px; font-weight:800; color:var(--text-muted); margin: 26px 0 12px;
+  letter-spacing:1px; text-transform:uppercase; display:flex; align-items:center; gap:8px;
+}
+.section-title::after{ content:""; flex:1; height:1px; background:var(--border); }
+.section-title:first-child{ margin-top:0; }
+
+/* ===== Ad dial ===== */
+.dial-wrap{ display:flex; flex-direction:column; align-items:center; padding: 10px 0 4px; }
+.dial{ position:relative; width:184px; height:184px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; border:none; background:none; }
+.dial-ring{
+  position:absolute; inset:0; border-radius:50%;
+  background: conic-gradient(var(--brass) calc(var(--progress, 0) * 1%), rgba(255,255,255,.06) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  transition: background .8s ease;
+}
+.dial-core{
+  position:relative; width:154px; height:154px; border-radius:50%;
+  background: linear-gradient(160deg, var(--surface-2), #0e1218 75%);
+  border:1px solid var(--border-strong);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+  transition: transform .12s ease;
+}
+.dial:active .dial-core{ transform: scale(.97); }
+.dial-core .play-icon{ width:26px; height:26px; color:var(--brass); }
+.dial-core .cta{ font-size:12.5px; font-weight:700; letter-spacing:.2px; color:var(--text); }
+.dial-core .sub{ font-size:11px; color:var(--text-muted); }
+.dial-core .sub b{ color:var(--brass-2); font-weight:700; }
+.dial-progress-label{ margin-top:16px; font-size:12px; color:var(--text-muted); letter-spacing:.2px; }
+.burst{ position:absolute; inset:0; pointer-events:none; }
+.spark{ position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%; background: var(--brass-2); opacity:0; }
+
+.card{ background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:11px; }
+.row{ display:flex; align-items:center; justify-content:space-between; }
+.row + .row{ margin-top:11px; padding-top:11px; border-top:1px solid var(--border); }
+.row .k{ font-size:12.5px; color:var(--text-muted); }
+.row .v{ font-size:13.5px; font-weight:700; letter-spacing:.1px; }
+.btn{
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px;
+  border-radius:12px; border:1px solid transparent; font-family:inherit; font-size:13.5px; font-weight:700;
+  cursor:pointer; color:var(--text); letter-spacing:.1px; transition: filter .15s ease, transform .1s ease;
+}
+.btn:active{ transform: scale(.99); }
+.btn-primary{ background: var(--accent); color:#08131c; }
+.btn-primary:active{ filter:brightness(.94); }
+.btn-ton{ background: var(--brass); color:#1a1206; }
+.btn-ton:active{ filter:brightness(.94); }
+.btn-ghost{ background: var(--surface-2); color:var(--text-dim); border:1px solid var(--border-strong); }
+.btn[disabled]{ opacity:.4; pointer-events:none; }
+.input{
+  width:100%; padding:13px 14px; border-radius:10px; background: var(--surface-2);
+  border:1px solid var(--border-strong); color:var(--text); font-family:inherit; font-size:13.5px; margin-bottom:10px;
+}
+.input::placeholder{ color:var(--text-muted); }
+.input:focus{ outline:none; border-color:var(--accent-dim); }
+.hint{ font-size:11.5px; color:var(--text-muted); line-height:1.75; margin-top:8px; padding-inline-start:12px; border-inline-start:2px solid var(--border-strong); }
+.hint.warn{ border-inline-start-color: var(--brass); color:#b7ac93; }
+.ref-link{
+  display:flex; align-items:center; gap:8px; background: var(--surface-2); border:1px solid var(--border-strong);
+  border-radius:10px; padding:13px 14px; font-size:12px; color:var(--text-dim); direction:ltr; text-align:left;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.empty{ text-align:center; padding:28px 10px; color:var(--text-muted); font-size:12.5px; line-height:1.7; }
+.mining-card{ background: linear-gradient(160deg, #131b17, var(--surface)); border-color: rgba(78,157,120,.16); }
+.rate-pill{
+  display:inline-flex; align-items:center; gap:6px; background: var(--success-bg); color:#8fd0ac;
+  padding:5px 11px; border-radius:8px; font-size:11px; font-weight:700; letter-spacing:.2px;
+}
+.rate-pill svg{ width:12px; height:12px; }
+.friend-row{
+  display:flex; align-items:center; justify-content:space-between; padding:11px 0;
+}
+.friend-row + .friend-row{ border-top:1px solid var(--border); }
+.friend-name{ font-size:12.5px; font-weight:700; color:var(--text); }
+.friend-status{ font-size:11px; font-weight:700; padding:4px 9px; border-radius:7px; letter-spacing:.2px; }
+.friend-status.active{ background: var(--success-bg); color:#8fd0ac; }
+.friend-status.claimed{ background: var(--surface-2); color:var(--text-muted); }
+.friend-status.pending{ background: rgba(198,162,92,.12); color:var(--brass-2); }
+nav{
+  position:fixed; bottom:0; left:0; right:0; background: rgba(10,13,18,.94); backdrop-filter: blur(16px);
+  border-top:1px solid var(--border); padding: 9px 12px calc(9px + var(--safe-bottom)); display:flex; gap:2px; z-index:20;
+}
+.tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none;
+  color:var(--text-muted); font-family:inherit; padding:7px 2px 9px; border-radius:10px; cursor:pointer; position:relative;
+}
+.tab svg{ width:20px; height:20px; }
+.tab span{ font-size:10px; font-weight:700; letter-spacing:.2px; }
+.tab.active{ color:var(--text); }
+.tab.active::after{
+  content:""; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+  width:16px; height:2px; border-radius:2px; background:var(--brass);
+}
+.toast{
+  position:fixed; top: calc(12px + var(--safe-top)); left:50%; transform:translateX(-50%) translateY(-140%);
+  background:var(--surface-3); border:1px solid var(--border-strong); color:var(--text); padding:11px 18px;
+  border-radius:10px; font-size:12.5px; font-weight:700; z-index:50; transition: transform .3s cubic-bezier(.2,.8,.2,1);
+  box-shadow:0 10px 30px rgba(0,0,0,.4); white-space:nowrap;
+}
+.toast.show{ transform:translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
 
 <!-- ===================== Splash / Loading ===================== -->
 <div id="splash">
-  <svg class="splash-mark" viewBox="0 0 48 48" fill="none">
-    <path d="M24 3 43 14v20L24 45 5 34V14Z" stroke="url(#g1)" stroke-width="1.6"/>
-    <path d="M24 14 33.5 19.5v11L24 36 14.5 30.5v-11Z" fill="url(#g1)" opacity=".9"/>
-    <defs><linearGradient id="g1" x1="5" y1="3" x2="43" y2="45"><stop offset="0" stop-color="#4a94c9"/><stop offset="1" stop-color="#c6a25c"/></linearGradient></defs>
-  </svg>
+  <div class="splash-mark">
+    <img src="assets/logo_1.png" alt="TapEarn logo">
+  </div>
   <div class="splash-title">TapEarn</div>
   <div class="splash-bar-track"><div class="splash-bar-fill" id="splashBarFill"></div></div>
-  <div class="splash-status" id="splashStatus">جارِ التحضير…</div>
+  <div class="splash-status" id="splashStatus">Preparing…</div>
 </div>
 
 <header>
   <div class="header-row">
     <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 48 48" fill="none">
-        <path d="M24 3 43 14v20L24 45 5 34V14Z" stroke="url(#g2)" stroke-width="2.2"/>
-        <path d="M24 14 33.5 19.5v11L24 36 14.5 30.5v-11Z" fill="url(#g2)" opacity=".9"/>
-        <defs><linearGradient id="g2" x1="5" y1="3" x2="43" y2="45"><stop offset="0" stop-color="#4a94c9"/><stop offset="1" stop-color="#c6a25c"/></linearGradient></defs>
-      </svg>
+      <div class="brand-mark">
+        <img src="assets/logo_1.png" alt="TapEarn logo">
+      </div>
       <span>TapEarn</span>
     </div>
-    <div class="avatar" id="avatarInitial">؟</div>
+    <div class="avatar" id="avatarInitial">?</div>
   </div>
+
   <div class="balance-card">
     <div>
-      <div class="balance-label">الرصيد الحالي</div>
+      <div class="balance-label">Current Balance</div>
       <div class="balance-value mono"><span id="balanceValue">0.000</span><span class="unit">TON</span></div>
       <div class="balance-usd" id="balanceUsd">≈ $0.00</div>
     </div>
@@ -263,96 +278,99 @@
         <div class="dial-ring" id="orbRing"></div>
         <div class="dial-core">
           <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15l13-7.5Z"/></svg>
-          <div class="cta">مشاهدة إعلان</div>
+          <div class="cta">Watch Ad</div>
           <div class="sub">+<b>0.002</b> TON</div>
         </div>
         <div class="burst" id="burst"></div>
       </button>
-      <div class="dial-progress-label" id="progressLabel">0 / 20 مشاهدة اليوم</div>
+      <div class="dial-progress-label" id="progressLabel">0 / 20 views today</div>
     </div>
-    <div class="section-title">إحصائياتك</div>
+
+    <div class="section-title">Your Stats</div>
     <div class="card">
-      <div class="row"><span class="k">أرباح اليوم</span><span class="v mono" id="statToday">0.000 TON</span></div>
-      <div class="row"><span class="k">إجمالي المشاهدات</span><span class="v mono" id="statViews">0</span></div>
-      <div class="row"><span class="k">الحد اليومي المتبقي</span><span class="v mono" id="statLeft">20</span></div>
+      <div class="row"><span class="k">Today's Earnings</span><span class="v mono" id="statToday">0.000 TON</span></div>
+      <div class="row"><span class="k">Total Views</span><span class="v mono" id="statViews">0</span></div>
+      <div class="row"><span class="k">Views Left Today</span><span class="v mono" id="statLeft">20</span></div>
     </div>
-    <div class="hint">يتجدد الحد اليومي للمشاهدات كل 24 ساعة. المكافأة تُحتسب فقط بعد تأكيد الخادم لاكتمال المشاهدة.</div>
+    <div class="hint">The daily view limit resets every 24 hours. Rewards are only credited after the server confirms the ad view was completed.</div>
   </section>
 
   <!-- ===== Mining ===== -->
   <section class="view" id="view-mining">
-    <div class="section-title">التعدين التلقائي</div>
+    <div class="section-title">Auto Mining</div>
     <div class="card mining-card">
       <div class="row">
-        <span class="k">معدل التعدين</span>
+        <span class="k">Mining Rate</span>
         <span class="rate-pill">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
-          0.0004 TON / ساعة
+          0.0004 TON / hour
         </span>
       </div>
-      <div class="row"><span class="k">الرصيد المُعدَّن غير المُحصَّل</span><span class="v mono" id="miningPending">0.0000 TON</span></div>
-      <div class="row"><span class="k">الوقت المتبقي للحد الأقصى</span><span class="v mono" id="miningTimer">04:00:00</span></div>
+      <div class="row"><span class="k">Unclaimed Mined Balance</span><span class="v mono" id="miningPending">0.0000 TON</span></div>
+      <div class="row"><span class="k">Time Until Cap</span><span class="v mono" id="miningTimer">04:00:00</span></div>
     </div>
-    <button class="btn btn-primary" id="claimMiningBtn">تحصيل الأرباح</button>
-    <div class="hint">التعدين يتوقف تلقائيًا عند الوصول للحد الأقصى للتخزين — افتح التطبيق لتحصيل الرصيد وإعادة التشغيل.</div>
-    <div class="section-title">رفع سرعة التعدين</div>
+    <button class="btn btn-primary" id="claimMiningBtn">Claim Earnings</button>
+    <div class="hint">Mining automatically stops once it reaches the storage cap — open the app to claim your balance and restart it.</div>
+
+    <div class="section-title">Boost Mining Speed</div>
     <div class="card">
-      <div class="row"><span class="k">المستوى الحالي</span><span class="v">1</span></div>
-      <div class="row"><span class="k">الترقية القادمة</span><span class="v">×1.5 السرعة</span></div>
+      <div class="row"><span class="k">Current Level</span><span class="v">1</span></div>
+      <div class="row"><span class="k">Next Upgrade</span><span class="v">×1.5 Speed</span></div>
     </div>
-    <button class="btn btn-ghost" id="boostBtn">مشاهدة إعلان لمضاعفة السرعة 3 ساعات</button>
+    <button class="btn btn-ghost" id="boostBtn">Watch an ad to boost speed for 3 hours</button>
   </section>
 
   <!-- ===== Referrals ===== -->
   <section class="view" id="view-ref">
-    <div class="section-title">ادعُ أصدقاءك</div>
+    <div class="section-title">Invite Friends</div>
     <div class="card">
-      <div class="row"><span class="k">مكافأتك عن كل إحالة نشطة</span><span class="v mono" id="refRewardRate">0.010 TON</span></div>
-      <div class="row"><span class="k">مكافآت غير مستلمة</span><span class="v mono" id="refUnclaimed">0.000 TON</span></div>
+      <div class="row"><span class="k">Your reward per active referral</span><span class="v mono" id="refRewardRate">0.010 TON</span></div>
+      <div class="row"><span class="k">Unclaimed rewards</span><span class="v mono" id="refUnclaimed">0.000 TON</span></div>
     </div>
-    <button class="btn btn-primary" id="claimRefBtn" disabled>مطالبة بالمكافأة</button>
+    <button class="btn btn-primary" id="claimRefBtn" disabled>Claim Reward</button>
 
-    <div class="section-title">رابط الإحالة الخاص بك</div>
-    <div class="ref-link" id="refLink">جارِ التحميل…</div>
-    <button class="btn btn-primary" id="copyRefBtn" style="margin-top:10px;">نسخ الرابط</button>
-    <button class="btn btn-ghost" id="shareRefBtn" style="margin-top:10px;">مشاركة عبر تيليجرام</button>
+    <div class="section-title">Your Referral Link</div>
+    <div class="ref-link" id="refLink">Loading…</div>
+    <button class="btn btn-primary" id="copyRefBtn" style="margin-top:10px;">Copy Link</button>
+    <button class="btn btn-ghost" id="shareRefBtn" style="margin-top:10px;">Share via Telegram</button>
 
-    <div class="section-title">إحالاتك (<span id="refCount">0</span>)</div>
-    <div class="card" id="refListCard"><div class="empty" id="refEmpty">لا يوجد أصدقاء مدعوّين بعد. شارك رابطك لتبدأ بالربح.</div></div>
+    <div class="section-title">Your Referrals (<span id="refCount">0</span>)</div>
+    <div class="card" id="refListCard"><div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div></div>
   </section>
 
   <!-- ===== Withdraw ===== -->
   <section class="view" id="view-withdraw">
-    <div class="section-title">سحب الأرباح</div>
+    <div class="section-title">Withdraw Earnings</div>
     <div class="card">
-      <div class="row"><span class="k">الرصيد القابل للسحب</span><span class="v mono" id="withdrawableBalance">0.000 TON</span></div>
-      <div class="row"><span class="k">الحد الأدنى للسحب</span><span class="v mono">0.200 TON</span></div>
+      <div class="row"><span class="k">Withdrawable Balance</span><span class="v mono" id="withdrawableBalance">0.000 TON</span></div>
+      <div class="row"><span class="k">Minimum Withdrawal</span><span class="v mono">0.200 TON</span></div>
     </div>
-    <input class="input" id="tonWallet" placeholder="عنوان محفظة TON (UQ... / EQ...)" dir="ltr">
-    <input class="input" id="withdrawAmount" placeholder="المبلغ (TON)" dir="ltr" inputmode="decimal">
-    <button class="btn btn-ton" id="withdrawBtn">طلب سحب</button>
-    <div class="hint warn">السحب يُرسَل كطلب إلى الخادم للمراجعة والتنفيذ — لا يتم توقيع أو إرسال أي معاملة من داخل هذه الصفحة مباشرة، حماية لمفاتيح المستخدمين.</div>
-    <div class="section-title">سجل عمليات السحب</div>
-    <div class="card"><div class="empty" id="withdrawHistoryEmpty">لا توجد عمليات سحب سابقة.</div></div>
+    <input class="input" id="tonWallet" placeholder="TON wallet address (UQ... / EQ...)" dir="ltr">
+    <input class="input" id="withdrawAmount" placeholder="Amount (TON)" dir="ltr" inputmode="decimal">
+    <button class="btn btn-ton" id="withdrawBtn">Request Withdrawal</button>
+    <div class="hint warn">Withdrawals are sent as a request to the server for review and processing — no transaction is signed or sent directly from this page, to protect users' keys.</div>
+
+    <div class="section-title">Withdrawal History</div>
+    <div class="card"><div class="empty" id="withdrawHistoryEmpty">No previous withdrawals.</div></div>
   </section>
 </main>
 
 <nav>
   <button class="tab active" data-view="view-home">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
-    <span>الرئيسية</span>
+    <span>Home</span>
   </button>
   <button class="tab" data-view="view-mining">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M7 3v2M12 3v2M17 3v2M7 19v2M12 19v2M17 19v2M3 7h2M3 12h2M3 17h2M19 7h2M19 12h2M19 17h2"/></svg>
-    <span>التعدين</span>
+    <span>Mining</span>
   </button>
   <button class="tab" data-view="view-ref">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.2c2.2.5 3.8 2.2 3.8 5.8"/></svg>
-    <span>الإحالات</span>
+    <span>Referrals</span>
   </button>
   <button class="tab" data-view="view-withdraw">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><path d="M6 15h4"/></svg>
-    <span>السحب</span>
+    <span>Withdraw</span>
   </button>
 </nav>
 
@@ -360,7 +378,7 @@
 
 <script>
 /* =========================================================
-   1) إعدادات عامة — عدّل هذه القيم قبل النشر
+   1) General settings — edit these before deploying
    ========================================================= */
 const CONFIG = {
   ADSGRAM_BLOCK_ID: "int-00000",
@@ -384,6 +402,7 @@ const CONFIG = {
    ========================================================= */
 const tg = window.Telegram?.WebApp;
 let tgUser = null;
+
 function initTelegram() {
   if (!tg) return;
   tg.ready();
@@ -398,10 +417,10 @@ function initTelegram() {
 }
 
 /* =========================================================
-   3) Firebase init + مصادقة عبر الخادم
-   ⚠️ initData لا يُتحقق منه هنا. الخادم (Render) هو من يحسب
-   HMAC عبر bot token ويرجّع نتيجة موثوقة. هذا الكود فقط
-   يرسل initData ويستقبل حالة تسجيل الدخول.
+   3) Firebase init + server-side auth
+   ⚠️ initData is not verified here. The server (Render) computes
+   the HMAC using the bot token and returns a trusted result. This
+   code only sends initData and receives the login state.
    ========================================================= */
 let db = null;
 function initFirebase() {
@@ -420,27 +439,29 @@ async function verifySessionOnServer() {
 }
 
 /* =========================================================
-   4) Splash / Loading — خطوات تحضير حقيقية، بدون تأخير مصطنع
+   4) Splash / Loading — real preparation steps, no artificial delay
    ========================================================= */
 async function runSplashSequence() {
   const fill = document.getElementById("splashBarFill");
   const status = document.getElementById("splashStatus");
   const steps = [
-    { pct: 20, label: "تحميل واجهة تيليجرام…", fn: initTelegram },
-    { pct: 50, label: "الاتصال بـ Firebase…", fn: initFirebase },
-    { pct: 85, label: "التحقق من الجلسة…", fn: async () => {
+    { pct: 20, label: "Loading Telegram interface…", fn: initTelegram },
+    { pct: 50, label: "Connecting to Firebase…", fn: initFirebase },
+    { pct: 85, label: "Verifying session…", fn: async () => {
         try { await verifySessionOnServer(); }
         catch (e) { console.warn("verify skipped (backend not configured yet)", e); }
       }
     },
-    { pct: 100, label: "جاهز", fn: async () => {} },
+    { pct: 100, label: "Ready", fn: async () => {} },
   ];
+
   for (const step of steps) {
     status.textContent = step.label;
     await step.fn();
     fill.style.width = step.pct + "%";
     await new Promise(r => setTimeout(r, 120));
   }
+
   document.getElementById("splash").classList.add("hidden");
 }
 
@@ -458,7 +479,7 @@ document.querySelectorAll(".tab").forEach(tab => {
   });
 });
 
-/* نقرة خفيفة موحّدة لكل الأزرار (.btn) بدون تكرار الكود بكل معالج */
+/* Unified light click sound for all buttons (.btn) without duplicating code per handler */
 document.addEventListener("click", (e) => {
   const btn = e.target.closest(".btn");
   if (btn && !btn.disabled) playClickSound();
@@ -476,7 +497,7 @@ function showToast(msg) {
 }
 
 /* =========================================================
-   6b) أصوات — مولّدة برمجيًا عبر Web Audio API (لا ملفات خارجية)
+   6b) Sounds — generated programmatically via Web Audio API (no external files)
    ========================================================= */
 let audioCtx = null;
 function getAudioCtx() {
@@ -520,7 +541,7 @@ function playClickSound() {
 }
 
 /* =========================================================
-   7) حالة التطبيق — تُملأ لاحقًا من Firestore عبر الخادم
+   7) App state — populated later from Firestore via the server
    ========================================================= */
 let state = { balance: 0, viewsToday: 0, totalViews: 0 };
 
@@ -531,13 +552,13 @@ function renderBalance() {
   document.getElementById("statViews").textContent = state.totalViews;
   const left = Math.max(0, CONFIG.DAILY_AD_LIMIT - state.viewsToday);
   document.getElementById("statLeft").textContent = left;
-  document.getElementById("progressLabel").textContent = `${state.viewsToday} / ${CONFIG.DAILY_AD_LIMIT} مشاهدة اليوم`;
+  document.getElementById("progressLabel").textContent = `${state.viewsToday} / ${CONFIG.DAILY_AD_LIMIT} views today`;
   document.getElementById("orbRing").style.setProperty("--progress", Math.min(100, (state.viewsToday / CONFIG.DAILY_AD_LIMIT) * 100));
   document.getElementById("orbBtn").disabled = left <= 0;
 }
 
 /* =========================================================
-   8) الاستماع لتحديثات الرصيد من Firestore (بعد التحقق من initData بالخادم)
+   8) Listen for balance updates from Firestore (after the server verifies initData)
    ========================================================= */
 function listenToUserDoc() {
   if (!db || !tgUser) return;
@@ -553,7 +574,7 @@ function listenToUserDoc() {
 }
 
 /* =========================================================
-   9) AdsGram — عرض إعلان مكافأة
+   9) AdsGram — show a rewarded ad
    ========================================================= */
 let AdController = null;
 function initAds() {
@@ -591,8 +612,8 @@ async function confirmAdViewOnServer() {
 }
 
 document.getElementById("orbBtn").addEventListener("click", async () => {
-  if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) { showToast("وصلت للحد الأقصى اليوم"); return; }
-  if (!AdController) { showToast("الإعلانات غير متاحة حاليًا"); return; }
+  if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) { showToast("You've reached today's limit"); return; }
+  if (!AdController) { showToast("Ads are currently unavailable"); return; }
   try {
     await AdController.show();
     await confirmAdViewOnServer();
@@ -601,15 +622,14 @@ document.getElementById("orbBtn").addEventListener("click", async () => {
     tg?.HapticFeedback?.notificationOccurred("success");
   } catch (e) {
     console.warn("Ad flow error", e);
-    showToast("لم تكتمل مشاهدة الإعلان");
+    showToast("Ad view was not completed");
   }
 });
 
 /* =========================================================
-   10) الإحالات — مرتبطة فعليًا بالخادم/Firestore
+   10) Referrals — connected to the server/Firestore
    ========================================================= */
 let currentReferralLink = "";
-
 async function loadReferrals() {
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/list`, {
@@ -619,11 +639,10 @@ async function loadReferrals() {
     });
     if (!res.ok) throw new Error("failed to load referrals");
     const data = await res.json();
-
     currentReferralLink = data.referralLink || "";
     document.getElementById("refLink").textContent = currentReferralLink
       ? currentReferralLink.replace("https://", "")
-      : "غير متاح حاليًا";
+      : "Not available yet";
     document.getElementById("refCount").textContent = data.referralCount || 0;
     document.getElementById("refRewardRate").textContent = data.rewardPerReferral.toFixed(3) + " TON";
     document.getElementById("refUnclaimed").textContent = data.unclaimedReward.toFixed(3) + " TON";
@@ -631,12 +650,12 @@ async function loadReferrals() {
 
     const listCard = document.getElementById("refListCard");
     if (!data.referrals || data.referrals.length === 0) {
-      listCard.innerHTML = '<div class="empty" id="refEmpty">لا يوجد أصدقاء مدعوّين بعد. شارك رابطك لتبدأ بالربح.</div>';
+      listCard.innerHTML = '<div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div>';
     } else {
       listCard.innerHTML = data.referrals.map(r => {
-        const label = r.username ? "@" + r.username : (r.name || "مستخدم");
+        const label = r.username ? "@" + r.username : (r.name || "User");
         const statusClass = r.rewardClaimed ? "claimed" : (r.status === "active" ? "active" : "pending");
-        const statusText = r.rewardClaimed ? "تم الاستلام" : (r.status === "active" ? "نشطة" : "قيد الانتظار");
+        const statusText = r.rewardClaimed ? "Claimed" : (r.status === "active" ? "Active" : "Pending");
         return `
           <div class="friend-row">
             <span class="friend-name">${label}</span>
@@ -650,13 +669,15 @@ async function loadReferrals() {
 }
 
 document.getElementById("copyRefBtn").addEventListener("click", () => {
-  if (!currentReferralLink) { showToast("الرابط غير جاهز بعد"); return; }
-  navigator.clipboard?.writeText(currentReferralLink).then(() => showToast("تم نسخ الرابط"));
+  if (!currentReferralLink) { showToast("Link not ready yet"); return; }
+  navigator.clipboard?.writeText(currentReferralLink).then(() => showToast("Link copied"));
 });
+
 document.getElementById("shareRefBtn").addEventListener("click", () => {
-  if (!currentReferralLink) { showToast("الرابط غير جاهز بعد"); return; }
+  if (!currentReferralLink) { showToast("Link not ready yet"); return; }
   tg?.openTelegramLink?.(`https://t.me/share/url?url=${encodeURIComponent(currentReferralLink)}`);
 });
+
 document.getElementById("claimRefBtn").addEventListener("click", async () => {
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/claim`, {
@@ -667,28 +688,30 @@ document.getElementById("claimRefBtn").addEventListener("click", async () => {
     if (!res.ok) throw new Error("claim failed");
     const data = await res.json();
     if (data.claimed > 0) {
-      showToast(`تم استلام ${data.amount.toFixed(3)} TON من ${data.claimed} إحالة`);
+      showToast(`Claimed ${data.amount.toFixed(3)} TON from ${data.claimed} referrals`);
       playClaimSound();
       loadReferrals();
     } else {
-      showToast("لا يوجد مكافآت متاحة حاليًا");
+      showToast("No rewards available right now");
     }
   } catch (e) {
     console.warn(e);
-    showToast("تعذر استلام المكافأة");
+    showToast("Could not claim reward");
   }
 });
+
 document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", loadReferrals);
 
 /* =========================================================
-   11) السحب — الكلاينت لا يوقّع أي معاملة، فقط يرسل طلب للخادم
+   11) Withdraw — the client never signs a transaction, it only sends a request to the server
    ========================================================= */
 document.getElementById("withdrawBtn").addEventListener("click", async () => {
   const wallet = document.getElementById("tonWallet").value.trim();
   const amount = parseFloat(document.getElementById("withdrawAmount").value);
-  if (!wallet) { showToast("أدخل عنوان محفظة صالح"); return; }
-  if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`الحد الأدنى للسحب ${CONFIG.MIN_WITHDRAW} TON`); return; }
-  if (amount > state.balance) { showToast("الرصيد غير كافٍ"); return; }
+  if (!wallet) { showToast("Enter a valid wallet address"); return; }
+  if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`Minimum withdrawal is ${CONFIG.MIN_WITHDRAW} TON`); return; }
+  if (amount > state.balance) { showToast("Insufficient balance"); return; }
+
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/withdraw/request`, {
       method: "POST",
@@ -696,15 +719,15 @@ document.getElementById("withdrawBtn").addEventListener("click", async () => {
       body: JSON.stringify({ wallet, amount }),
     });
     if (!res.ok) throw new Error("withdraw request failed");
-    showToast("تم إرسال طلب السحب للمراجعة");
+    showToast("Withdrawal request sent for review");
   } catch (e) {
     console.warn(e);
-    showToast("تعذر إرسال الطلب، حاول لاحقًا");
+    showToast("Could not send request, try again later");
   }
 });
 
 /* =========================================================
-   12) نقطة الانطلاق
+   12) Entry point
    ========================================================= */
 window.addEventListener("DOMContentLoaded", async () => {
   await runSplashSequence();

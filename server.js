@@ -377,23 +377,22 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
         const firstName = message.from?.first_name || "there";
 
-        // رسالة ترحيب احترافية عند /start — تحمل اسم وهوية CrypStore 🏹
+        // رسالة ترحيب مختصرة واحترافية عند /start — تحمل اسم وهوية CrypStore 🏹
         const welcomeCaption =
-          `<b>🏹 Welcome to CrypStore, ${firstName}!</b>\n\n` +
-          `CrypStore is your gateway to earning real TON — simply by watching ads, inviting friends, and letting auto-mining work for you around the clock.\n\n` +
-          `<b>What you can do here:</b>\n` +
-          `💠 Watch short ads and earn TON instantly\n` +
-          `⛏ Auto-mine TON passively over time\n` +
-          `🤝 Invite friends and earn referral rewards\n` +
-          `💸 Withdraw straight to your TON wallet\n\n` +
-          `Tap <b>Open App</b> below to get started.`;
+          `🏹 <b>Welcome to CrypStore, ${firstName}!</b>\n\n` +
+          `⛏ Earn ${REWARD_PER_AD} GRAM per ad\n` +
+          `🤝 ${REFERRAL_REWARD} GRAM per invite\n` +
+          `💸 Fast payouts & full control over your wallet`;
 
         await sendTelegramPhoto(
           chatId,
           `${WEBAPP_URL}assets/logo_1.png`,
           welcomeCaption,
           {
-            inline_keyboard: [[{ text: "🏹 Open CrypStore", web_app: { url: WEBAPP_URL } }]],
+            inline_keyboard: [
+              [{ text: "🚀 Start CrypStore", web_app: { url: WEBAPP_URL } }],
+              [{ text: "🌐 Community", url: "https://t.me/CrypStore1" }],
+            ],
           }
         );
       }

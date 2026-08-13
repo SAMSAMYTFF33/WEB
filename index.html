@@ -122,7 +122,16 @@ header{
 .balance-value{ font-size:27px; font-weight:800; display:flex; align-items:baseline; gap:7px; letter-spacing:-.3px; }
 .balance-value .unit{ font-size:12px; color:var(--brass); font-weight:700; letter-spacing:.5px; }
 .balance-usd{ font-size:11px; color:var(--text-muted); margin-top:6px; }
-.coin-icon{ width:42px; height:42px; position:relative; z-index:1; }
+.coin-icon{
+  width:42px; height:42px; position:relative; z-index:1;
+  border-radius:50%; overflow:hidden; flex-shrink:0;
+  background: var(--surface-2);
+  border:1.5px solid transparent;
+  background-image: linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--brass), var(--brass-2));
+  background-origin: border-box;
+  background-clip: content-box, border-box;
+}
+.coin-icon img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
 
 main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
 .view{ display:none; animation: fadein .3s ease; }
@@ -249,9 +258,9 @@ nav{
   <div class="header-row">
     <div class="brand">
       <div class="brand-mark">
-        <img src="assets/logo_1.png" alt="CrypStore logo">
+        <img id="brandLogoImg" src="assets/logo_1.png" alt="User avatar">
       </div>
-      <span>CrypStore 🏹</span>
+      <span id="brandName">CrypStore 🏹</span>
     </div>
     <div class="avatar" id="avatarInitial">?</div>
   </div>
@@ -262,11 +271,9 @@ nav{
       <div class="balance-value mono"><span id="balanceValue">0.000</span><span class="unit">TON</span></div>
       <div class="balance-usd" id="balanceUsd">≈ $0.00</div>
     </div>
-    <svg class="coin-icon" viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="21" stroke="var(--brass)" stroke-width="1.4" opacity=".5"/>
-      <path d="M24 8 38 16v16L24 40 10 32V16Z" stroke="var(--brass-2)" stroke-width="1.6"/>
-      <path d="M24 16 31 20v8l-7 4-7-4v-8Z" fill="var(--brass)" opacity=".85"/>
-    </svg>
+    <div class="coin-icon">
+      <img src="assets/logo_1.png" alt="CrypStore logo">
+    </div>
   </div>
 </header>
 
@@ -413,6 +420,22 @@ function initTelegram() {
   if (tgUser) {
     document.getElementById("avatarInitial").textContent =
       (tgUser.first_name || "U").trim().charAt(0).toUpperCase();
+
+    // Show the logged-in user's name/username in the header instead of the app name
+    const displayName = tgUser.username
+      ? "@" + tgUser.username
+      : [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") || "User";
+    const brandNameEl = document.getElementById("brandName");
+    if (brandNameEl) brandNameEl.textContent = displayName;
+
+    // Show the user's Telegram profile photo in the header mark, if available
+    if (tgUser.photo_url) {
+      const brandLogoImg = document.getElementById("brandLogoImg");
+      if (brandLogoImg) {
+        brandLogoImg.src = tgUser.photo_url;
+        brandLogoImg.alt = displayName;
+      }
+    }
   }
 }
 

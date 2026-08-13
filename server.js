@@ -192,6 +192,13 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
           `Go to the Friends section and claim your reward.`;
         await sendTelegramMessage(referrerId, notif);
       }
+    } else if (!doc.data().referralCode) {
+      // مستخدم قديم أُنشئ قبل إضافة نظام الإحالة — نولّد له كود الآن
+      const myCode = await createUniqueReferralCode();
+      await db.runTransaction(async (tx) => {
+        tx.update(ref, { referralCode: myCode, referralCount: doc.data().referralCount || 0 });
+        tx.set(db.collection("referralCodes").doc(myCode), { userId });
+      });
     }
 
     const fresh = await ref.get();

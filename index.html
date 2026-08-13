@@ -13,6 +13,8 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <!-- AdsGram SDK -->
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<!-- TON Connect UI (wallet connection for withdrawals) -->
+<script src="https://unpkg.com/@tonconnect/ui@2/dist/tonconnect-ui.min.js"></script>
 <!-- Firebase (compat build) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
@@ -206,6 +208,21 @@ main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
 .input:focus{ outline:none; border-color:var(--accent-dim); }
 .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.75; margin-top:8px; padding-inline-start:12px; border-inline-start:2px solid var(--border-strong); }
 .hint.warn{ border-inline-start-color: var(--brass); color:#b7ac93; }
+
+/* ===== Wallet connect card (TON Connect) ===== */
+.wallet-card{ display:flex; flex-direction:column; gap:14px; }
+.wallet-row{ display:flex; align-items:center; gap:12px; }
+.wallet-icon{
+  width:40px; height:40px; border-radius:12px; flex-shrink:0;
+  background:var(--surface-2); border:1px solid var(--border-strong);
+  display:flex; align-items:center; justify-content:center; color:var(--text-muted);
+}
+.wallet-icon svg{ width:19px; height:19px; }
+.wallet-icon.connected{ background:var(--success-bg); border-color:rgba(78,157,120,.3); color:#8fd0ac; }
+.wallet-copy{ flex:1; min-width:0; }
+.wallet-title{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wallet-title.mono{ letter-spacing:.2px; }
+.wallet-sub{ font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5; }
 .ref-link{
   display:flex; align-items:center; gap:8px; background: var(--surface-2); border:1px solid var(--border-strong);
   border-radius:10px; padding:13px 14px; font-size:12px; color:var(--text-dim); direction:ltr; text-align:left;
@@ -361,9 +378,33 @@ nav{
       <div class="row"><span class="k">Withdrawable Balance</span><span class="v mono" id="withdrawableBalance">0.000 TON</span></div>
       <div class="row"><span class="k">Minimum Withdrawal</span><span class="v mono">0.200 TON</span></div>
     </div>
-    <input class="input" id="tonWallet" placeholder="TON wallet address (UQ... / EQ...)" dir="ltr">
+
+    <div class="section-title">Destination Wallet</div>
+    <div class="card wallet-card">
+      <div class="wallet-row" id="walletDisconnected">
+        <div class="wallet-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><circle cx="16.5" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div class="wallet-copy">
+          <div class="wallet-title">No wallet connected</div>
+          <div class="wallet-sub">Connect your TON wallet to withdraw — no address to copy or paste.</div>
+        </div>
+      </div>
+      <div class="wallet-row" id="walletConnected" style="display:none;">
+        <div class="wallet-icon connected">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <div class="wallet-copy">
+          <div class="wallet-title mono" id="walletAddressShort">—</div>
+          <div class="wallet-sub" id="walletAppName">Connected</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="connectWalletBtn">Connect Wallet</button>
+      <button class="btn btn-ghost" id="disconnectWalletBtn" style="display:none;">Disconnect Wallet</button>
+    </div>
+
     <input class="input" id="withdrawAmount" placeholder="Amount (TON)" dir="ltr" inputmode="decimal">
-    <button class="btn btn-ton" id="withdrawBtn">Request Withdrawal</button>
+    <button class="btn btn-ton" id="withdrawBtn" disabled>Request Withdrawal</button>
     <div class="hint warn">Withdrawals are sent as a request to the server for review and processing — no transaction is signed or sent directly from this page, to protect users' keys.</div>
 
     <div class="section-title">Withdrawal History</div>
@@ -735,12 +776,74 @@ document.getElementById("claimRefBtn").addEventListener("click", async () => {
 document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", loadReferrals);
 
 /* =========================================================
-   11) Withdraw — the client never signs a transaction, it only sends a request to the server
+   11) TON Connect — wallet connection for withdrawals
+   Replaces manual address paste with a native wallet connect
+   flow (Tonkeeper, MyTonWallet, etc). The connected wallet's
+   address is used automatically when requesting a withdrawal.
+   ========================================================= */
+let tonConnectUI = null;
+let connectedWalletAddress = null; // user-friendly (UQ.../EQ...) format
+
+function shortenAddress(addr) {
+  if (!addr) return "—";
+  return addr.slice(0, 6) + "…" + addr.slice(-6);
+}
+
+function renderWalletConnected(wallet) {
+  document.getElementById("walletDisconnected").style.display = "none";
+  document.getElementById("walletConnected").style.display = "flex";
+  document.getElementById("walletAddressShort").textContent = shortenAddress(connectedWalletAddress);
+  document.getElementById("walletAppName").textContent = `Connected via ${wallet?.device?.appName || "TON wallet"}`;
+  document.getElementById("connectWalletBtn").style.display = "none";
+  document.getElementById("disconnectWalletBtn").style.display = "flex";
+  document.getElementById("withdrawBtn").disabled = false;
+}
+
+function renderWalletDisconnected() {
+  document.getElementById("walletDisconnected").style.display = "flex";
+  document.getElementById("walletConnected").style.display = "none";
+  document.getElementById("connectWalletBtn").style.display = "flex";
+  document.getElementById("disconnectWalletBtn").style.display = "none";
+  document.getElementById("withdrawBtn").disabled = true;
+}
+
+function initTonConnect() {
+  if (!window.TON_CONNECT_UI) {
+    console.warn("TonConnect UI script failed to load");
+    return;
+  }
+  const manifestUrl = new URL("tonconnect-manifest.json", window.location.href).toString();
+  tonConnectUI = new TON_CONNECT_UI.TonConnectUI({ manifestUrl });
+
+  tonConnectUI.onStatusChange((wallet) => {
+    if (wallet) {
+      connectedWalletAddress = TON_CONNECT_UI.toUserFriendlyAddress(wallet.account.address);
+      renderWalletConnected(wallet);
+    } else {
+      connectedWalletAddress = null;
+      renderWalletDisconnected();
+    }
+  });
+}
+
+document.getElementById("connectWalletBtn").addEventListener("click", () => {
+  if (!tonConnectUI) { showToast("Wallet connect is unavailable right now"); return; }
+  tonConnectUI.openModal();
+});
+
+document.getElementById("disconnectWalletBtn").addEventListener("click", async () => {
+  if (!tonConnectUI) return;
+  await tonConnectUI.disconnect();
+  showToast("Wallet disconnected");
+});
+
+/* =========================================================
+   12) Withdraw — the client never signs a transaction, it only sends a request to the server
    ========================================================= */
 document.getElementById("withdrawBtn").addEventListener("click", async () => {
-  const wallet = document.getElementById("tonWallet").value.trim();
+  const wallet = connectedWalletAddress;
   const amount = parseFloat(document.getElementById("withdrawAmount").value);
-  if (!wallet) { showToast("Enter a valid wallet address"); return; }
+  if (!wallet) { showToast("Connect your wallet first"); return; }
   if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`Minimum withdrawal is ${CONFIG.MIN_WITHDRAW} TON`); return; }
   if (amount > state.balance) { showToast("Insufficient balance"); return; }
 
@@ -759,7 +862,7 @@ document.getElementById("withdrawBtn").addEventListener("click", async () => {
 });
 
 /* =========================================================
-   12) Disable copy / long-press context menu / text selection
+   13) Disable copy / long-press context menu / text selection
    Applies everywhere except inputs & textareas (wallet address,
    withdraw amount) which must stay copy/paste-able.
    ========================================================= */
@@ -783,11 +886,12 @@ document.addEventListener("dragstart", (e) => {
 });
 
 /* =========================================================
-   13) Entry point
+   14) Entry point
    ========================================================= */
 window.addEventListener("DOMContentLoaded", async () => {
   await runSplashSequence();
   initAds();
+  initTonConnect();
   listenToUserDoc();
   renderBalance();
   loadReferrals();

@@ -12,6 +12,8 @@
  *  - DAILY_AD_LIMIT           : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
  *  - MIN_WITHDRAW             : (اختياري) حد أدنى السحب، افتراضي 0.2
  *  - WEBAPP_URL               : رابط GitHub Pages (متلا https://samsamytff33.github.io/WEB/)
+ *  - BOT_USERNAME             : يوزر البوت بدون @ (لبناء روابط الإحالة)
+ *  - REFERRAL_REWARD          : (اختياري) مكافأة كل إحالة نشطة، افتراضي 0.01
  *  - TELEGRAM_WEBHOOK_SECRET  : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
  *                                الطلبات الواردة على /api/telegram/webhook
  *                                فعليًا من تيليجرام وليس من أي جهة أخرى
@@ -44,6 +46,8 @@ const REWARD_PER_AD = parseFloat(process.env.REWARD_PER_AD || "0.002");
 const DAILY_AD_LIMIT = parseInt(process.env.DAILY_AD_LIMIT || "20", 10);
 const MIN_WITHDRAW = parseFloat(process.env.MIN_WITHDRAW || "0.2");
 const WEBAPP_URL = process.env.WEBAPP_URL || "https://samsamytff33.github.io/WEB/";
+const BOT_USERNAME = process.env.BOT_USERNAME || "Bbotfrubot";
+const REFERRAL_REWARD = parseFloat(process.env.REFERRAL_REWARD || "0.01");
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -100,6 +104,27 @@ function todayKey() {
 }
 
 // =========================================================
+// توليد كود إحالة قصير وفريد (6 محارف، بدون رموز ملتبسة زي 0/O أو 1/l/I)
+// ========================================================
+const REF_CODE_CHARS = "23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ";
+function generateReferralCode(length = 6) {
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += REF_CODE_CHARS[crypto.randomInt(REF_CODE_CHARS.length)];
+  }
+  return code;
+}
+
+async function createUniqueReferralCode() {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = generateReferralCode();
+    const doc = await db.collection("referralCodes").doc(code).get();
+    if (!doc.exists) return code;
+  }
+  throw new Error("could not generate unique referral code");
+}
+
+// =========================================================
 // POST /api/auth/verify
 // يتحقق من initData وينشئ مستند المستخدم إذا ما كان موجود
 // =========================================================
@@ -110,16 +135,63 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
     const doc = await ref.get();
 
     if (!doc.exists) {
-      await ref.set({
-        firstName: req.tgUser.first_name || "",
-        username: req.tgUser.username || "",
-        balance: 0,
-        viewsToday: 0,
-        totalViews: 0,
-        lastViewDate: todayKey(),
-        referredBy: null,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      const myCode = await createUniqueReferralCode();
+
+      // إذا فتح هذا المستخدم البوت عبر رابط إحالة (مسجل مسبقًا وقت /start)
+      let referrerId = null;
+      const pendingRef = await db.collection("pendingReferrals").doc(userId).get();
+      if (pendingRef.exists) {
+        const candidateReferrer = pendingRef.data().referrerId;
+        if (candidateReferrer && candidateReferrer !== userId) {
+          referrerId = candidateReferrer;
+        }
+      }
+
+      await db.runTransaction(async (tx) => {
+        tx.set(ref, {
+          firstName: req.tgUser.first_name || "",
+          username: req.tgUser.username || "",
+          balance: 0,
+          viewsToday: 0,
+          totalViews: 0,
+          lastViewDate: todayKey(),
+          referredBy: referrerId,
+          referralCode: myCode,
+          referralCount: 0,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        tx.set(db.collection("referralCodes").doc(myCode), { userId });
+
+        if (referrerId) {
+          const referralDocRef = db.collection("referrals").doc();
+          tx.set(referralDocRef, {
+            referrerId,
+            refereeId: userId,
+            refereeName: req.tgUser.first_name || "",
+            refereeUsername: req.tgUser.username || "",
+            status: "active", // نشطة فورًا لأنه هذا الاستدعاء بحد ذاته يعني المستخدم فتح التطبيق فعليًا
+            rewardClaimed: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          tx.update(db.collection("users").doc(referrerId), {
+            referralCount: admin.firestore.FieldValue.increment(1),
+          });
+        }
       });
+
+      if (pendingRef.exists) {
+        await db.collection("pendingReferrals").doc(userId).delete();
+      }
+
+      if (referrerId) {
+        const notif =
+          `A referral has been confirmed and is now Active!\n\n` +
+          `Name: ${req.tgUser.first_name || "N/A"}\n` +
+          `Username: ${req.tgUser.username ? "@" + req.tgUser.username : "N/A"}\n` +
+          `Telegram ID: ${userId}\n\n` +
+          `Go to the Friends section and claim your reward.`;
+        await sendTelegramMessage(referrerId, notif);
+      }
     }
 
     const fresh = await ref.get();
@@ -250,7 +322,29 @@ app.post("/api/telegram/webhook", async (req, res) => {
       const chatId = message.chat.id;
       const text = message.text.trim();
 
-      if (text === "/start") {
+      if (text.startsWith("/start")) {
+        const parts = text.split(" ");
+        const payload = parts.length > 1 ? parts[1].trim() : null;
+
+        if (payload) {
+          try {
+            const codeDoc = await db.collection("referralCodes").doc(payload).get();
+            if (codeDoc.exists) {
+              const referrerId = codeDoc.data().userId;
+              if (referrerId !== String(chatId)) {
+                // يُخزَّن مؤقتًا؛ يتحول لإحالة "نشطة" فقط عند أول فتح فعلي للتطبيق (/api/auth/verify)
+                await db.collection("pendingReferrals").doc(String(chatId)).set({
+                  referrerId,
+                  code: payload,
+                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+            }
+          } catch (e) {
+            console.error("referral payload error", e);
+          }
+        }
+
         await sendTelegramMessage(
           chatId,
           "Welcome to TapEarn.\nWatch ads, earn TON, and withdraw straight to your wallet. Tap below to get started.",
@@ -264,6 +358,81 @@ app.post("/api/telegram/webhook", async (req, res) => {
   } catch (e) {
     console.error("webhook error", e);
     res.sendStatus(200);
+  }
+});
+
+// =========================================================
+// POST /api/referrals/list
+// يرجّع كود/رابط الإحالة الخاص بالمستخدم، وقائمة إحالاته، والمكافآت غير المطالب بها
+// =========================================================
+app.post("/api/referrals/list", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return res.status(404).json({ error: "user not found" });
+    const userData = userDoc.data();
+
+    const snap = await db.collection("referrals").where("referrerId", "==", userId).get();
+    const referrals = [];
+    let unclaimedCount = 0;
+    snap.forEach((d) => {
+      const r = d.data();
+      referrals.push({
+        id: d.id,
+        name: r.refereeName,
+        username: r.refereeUsername,
+        status: r.status,
+        rewardClaimed: r.rewardClaimed,
+      });
+      if (r.status === "active" && !r.rewardClaimed) unclaimedCount++;
+    });
+
+    res.json({
+      ok: true,
+      referralCode: userData.referralCode || null,
+      referralLink: userData.referralCode ? `https://t.me/${BOT_USERNAME}?start=${userData.referralCode}` : null,
+      referralCount: userData.referralCount || 0,
+      referrals,
+      unclaimedReward: +(unclaimedCount * REFERRAL_REWARD).toFixed(6),
+      rewardPerReferral: REFERRAL_REWARD,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// =========================================================
+// POST /api/referrals/claim
+// يجمع كل الإحالات النشطة غير المُطالَب بمكافأتها ويضيفها للرصيد دفعة واحدة
+// =========================================================
+app.post("/api/referrals/claim", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const snap = await db
+      .collection("referrals")
+      .where("referrerId", "==", userId)
+      .where("status", "==", "active")
+      .where("rewardClaimed", "==", false)
+      .get();
+
+    if (snap.empty) {
+      return res.json({ ok: true, claimed: 0, amount: 0 });
+    }
+
+    const amount = +(snap.size * REFERRAL_REWARD).toFixed(6);
+    const userRef = db.collection("users").doc(userId);
+
+    await db.runTransaction(async (tx) => {
+      const docs = await Promise.all(snap.docs.map((d) => tx.get(d.ref)));
+      docs.forEach((d) => tx.update(d.ref, { rewardClaimed: true }));
+      tx.update(userRef, { balance: admin.firestore.FieldValue.increment(amount) });
+    });
+
+    res.json({ ok: true, claimed: snap.size, amount });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
   }
 });
 

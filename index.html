@@ -13,6 +13,8 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <!-- AdsGram SDK -->
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<!-- Monetag SDK (zone 11575327 — CrypStorebot) -->
+<script src='//libtl.com/sdk.js' data-zone='11575327' data-sdk='show_11575327'></script>
 <!-- TON Connect UI (wallet connection for withdrawals) -->
 <script src="https://unpkg.com/@tonconnect/ui@2/dist/tonconnect-ui.min.js"></script>
 <!-- Firebase (compat build) -->
@@ -451,6 +453,7 @@ nav{
    ========================================================= */
 const CONFIG = {
   ADSGRAM_BLOCK_ID: "int-00000",
+  MONETAG_SHOW_FN: "show_11575327", // Rewarded Interstitial, zone 11575327
   DAILY_AD_LIMIT: 20,
   COIN_TICKER: "BUX",
   COIN_PER_AD: 10,
@@ -687,7 +690,7 @@ function listenToUserDoc() {
 }
 
 /* =========================================================
-   9) AdsGram — show a rewarded ad
+   9) Ads — Monetag (primary, approved) with AdsGram as fallback
    ========================================================= */
 let AdController = null;
 function initAds() {
@@ -696,6 +699,21 @@ function initAds() {
   } catch (e) {
     console.warn("Adsgram init failed", e);
   }
+}
+
+// Tries Monetag's Rewarded Interstitial first; falls back to AdsGram if
+// the Monetag SDK isn't loaded/available for some reason. Throws if neither works.
+async function showRewardedAd() {
+  const monetagShow = window[CONFIG.MONETAG_SHOW_FN];
+  if (typeof monetagShow === "function") {
+    await monetagShow();
+    return;
+  }
+  if (AdController) {
+    await AdController.show();
+    return;
+  }
+  throw new Error("no ad provider available");
 }
 
 function burstCoins() {
@@ -718,7 +736,7 @@ async function confirmAdViewOnServer() {
   const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/ads/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-    body: JSON.stringify({ blockId: CONFIG.ADSGRAM_BLOCK_ID }),
+    body: JSON.stringify({}),
   });
   if (!res.ok) throw new Error("ad confirmation failed");
   return res.json();
@@ -726,9 +744,8 @@ async function confirmAdViewOnServer() {
 
 document.getElementById("orbBtn").addEventListener("click", async () => {
   if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) { showToast("You've reached today's limit"); return; }
-  if (!AdController) { showToast("Ads are currently unavailable"); return; }
   try {
-    await AdController.show();
+    await showRewardedAd();
     await confirmAdViewOnServer();
     burstCoins();
     playCoinSound();

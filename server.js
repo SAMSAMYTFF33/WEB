@@ -58,6 +58,10 @@ const TASKS = [
   },
 ];
 
+// ---------- الأدمن ----------
+// اسم المستخدم في تيليجرام (بدون @) المسموح له برؤية لوحة كل المستخدمين
+const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || "gz_73").toLowerCase();
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -103,6 +107,16 @@ function requireTelegramAuth(req, res, next) {
     return res.status(401).json({ error: "invalid or missing initData" });
   }
   req.tgUser = user;
+  next();
+}
+
+// Middleware: يسمح فقط لصاحب اسم المستخدم المحدد بـ ADMIN_USERNAME بالمرور
+// لازم يُستخدم دائمًا بعد requireTelegramAuth (يعتمد على req.tgUser)
+function requireAdmin(req, res, next) {
+  const username = (req.tgUser?.username || "").toLowerCase();
+  if (!username || username !== ADMIN_USERNAME) {
+    return res.status(403).json({ error: "forbidden" });
+  }
   next();
 }
 
@@ -653,6 +667,34 @@ app.post("/api/tasks/verify", requireTelegramAuth, async (req, res) => {
     });
 
     res.json({ ok: true, verified: true, reward: task.reward });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// =========================================================
+// POST /api/admin/users
+// يرجّع قائمة كل المستخدمين (بشكل منظم): الاسم، عدد الإحالات، BUX، GRAM
+// محمي: يعمل فقط لصاحب اسم المستخدم المحدد بـ ADMIN_USERNAME (gz_73 افتراضيًا)
+// =========================================================
+app.post("/api/admin/users", requireTelegramAuth, requireAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection("users").orderBy("createdAt", "desc").get();
+    const users = [];
+    snap.forEach((d) => {
+      const u = d.data();
+      users.push({
+        id: d.id,
+        firstName: u.firstName || "",
+        username: u.username || "",
+        referralCount: u.referralCount || 0,
+        coins: +(u.coins || 0).toFixed(2),   // BUX
+        balance: +(u.balance || 0).toFixed(4), // GRAM
+      });
+    });
+
+    res.json({ ok: true, count: users.length, users });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "internal error" });

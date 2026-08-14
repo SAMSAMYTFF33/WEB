@@ -335,13 +335,13 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
   });
 }
 
-async function sendTelegramPhoto(chatId, photoUrl, caption, replyMarkup) {
+async function sendTelegramPhoto(chatId, photoUrlOrFileId, caption, replyMarkup) {
   const res = await fetch(`${TELEGRAM_API}/sendPhoto`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
-      photo: photoUrl,
+      photo: photoUrlOrFileId,
       caption,
       parse_mode: "HTML",
       reply_markup: replyMarkup,
@@ -351,6 +351,42 @@ async function sendTelegramPhoto(chatId, photoUrl, caption, replyMarkup) {
   if (!data.ok) {
     console.error("sendPhoto failed, falling back to text:", data.description);
     await sendTelegramMessage(chatId, caption, replyMarkup);
+    return null;
+  }
+  return data.result; // includes .photo[] with a file_id per resolution
+}
+
+// =========================================================
+// Cache Telegram's own file_id for the /start welcome photo.
+// Sending the SAME external URL on every /start makes Telegram
+// treat it as a brand-new upload each time, forcing a fresh
+// download on the user's device (hence the visible "KB" size
+// badge, every single time). Sending by file_id instead reuses
+// the file already stored on Telegram's servers, so the app can
+// serve it from its own cache — no repeated download.
+// Cached in memory + Firestore so it survives server restarts.
+// =========================================================
+let cachedStartPhotoFileId = null;
+
+async function getStartPhotoFileId() {
+  if (cachedStartPhotoFileId) return cachedStartPhotoFileId;
+  try {
+    const doc = await db.collection("config").doc("assets").get();
+    if (doc.exists && doc.data().startPhotoFileId) {
+      cachedStartPhotoFileId = doc.data().startPhotoFileId;
+    }
+  } catch (e) {
+    console.warn("could not read cached start photo file_id", e);
+  }
+  return cachedStartPhotoFileId;
+}
+
+async function saveStartPhotoFileId(fileId) {
+  cachedStartPhotoFileId = fileId;
+  try {
+    await db.collection("config").doc("assets").set({ startPhotoFileId: fileId }, { merge: true });
+  } catch (e) {
+    console.warn("could not persist start photo file_id", e);
   }
 }
 
@@ -403,17 +439,26 @@ app.post("/api/telegram/webhook", async (req, res) => {
           `🤝 ${REFERRAL_REWARD} GRAM per invite\n` +
           `💸 Fast payouts & full control over your wallet`;
 
-        await sendTelegramPhoto(
-          chatId,
-          `${WEBAPP_URL}assets/logo_1.png`,
-          welcomeCaption,
-          {
-            inline_keyboard: [
-              [{ text: "🚀 Start CrypStore", web_app: { url: WEBAPP_URL } }],
-              [{ text: "🌐 Community", url: "https://t.me/CrypStore1" }],
-            ],
-          }
-        );
+        const replyMarkup = {
+          inline_keyboard: [
+            [{ text: "🚀 Start CrypStore", web_app: { url: WEBAPP_URL } }],
+            [{ text: "🌐 Community", url: "https://t.me/CrypStore1" }],
+          ],
+        };
+
+        // استخدام file_id المخزَّن مسبقًا إن وُجد، بدل رابط الصورة الخام،
+        // حتى لا يُعاد تحميل الصورة من جديد في كل مرة يضغط فيها أي مستخدم /start
+        const cachedFileId = await getStartPhotoFileId();
+        const photoSource = cachedFileId || `${WEBAPP_URL}assets/logo_2.png`;
+
+        const sendResult = await sendTelegramPhoto(chatId, photoSource, welcomeCaption, replyMarkup);
+
+        // أول إرسال ناجح عبر الرابط فقط: نخزّن الـ file_id الذي يرجعه تيليجرام
+        // لاستخدامه في كل الطلبات القادمة من أي مستخدم
+        if (!cachedFileId && sendResult?.photo?.length) {
+          const largest = sendResult.photo[sendResult.photo.length - 1];
+          await saveStartPhotoFileId(largest.file_id);
+        }
       }
     }
 

@@ -11,8 +11,6 @@
 <meta property="og:image" content="assets/logo_512.png">
 <!-- Telegram WebApp SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<!-- AdsGram SDK -->
-<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <!-- Monetag SDK (zone 11575327 — CrypStorebot) -->
 <script src='//libtl.com/sdk.js' data-zone='11575327' data-sdk='show_11575327'></script>
 <!-- TON Connect UI (wallet connection for withdrawals) -->
@@ -452,7 +450,6 @@ nav{
    1) General settings — edit these before deploying
    ========================================================= */
 const CONFIG = {
-  ADSGRAM_BLOCK_ID: "int-00000",
   MONETAG_SHOW_FN: "show_11575327", // Rewarded Interstitial, zone 11575327
   DAILY_AD_LIMIT: 20,
   COIN_TICKER: "BUX",
@@ -690,30 +687,33 @@ function listenToUserDoc() {
 }
 
 /* =========================================================
-   9) Ads — Monetag (primary, approved) with AdsGram as fallback
+   9) Ads — Monetag only
    ========================================================= */
-let AdController = null;
 function initAds() {
-  try {
-    AdController = window.Adsgram?.init({ blockId: CONFIG.ADSGRAM_BLOCK_ID });
-  } catch (e) {
-    console.warn("Adsgram init failed", e);
-  }
+  // Nothing to init — the Monetag SDK tag in <head> handles setup itself.
+  // Kept as a no-op so the call site (DOMContentLoaded) doesn't need to change.
 }
 
-// Tries Monetag's Rewarded Interstitial first; falls back to AdsGram if
-// the Monetag SDK isn't loaded/available for some reason. Throws if neither works.
+// Monetag injects window[MONETAG_SHOW_FN] asynchronously after its <script>
+// tag loads. On a slow connection the button can be tapped before that
+// function exists yet, so we wait briefly for it instead of failing instantly.
+function waitForMonetag(timeoutMs = 8000, intervalMs = 150) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function check() {
+      const fn = window[CONFIG.MONETAG_SHOW_FN];
+      if (typeof fn === "function") return resolve(fn);
+      if (Date.now() - start >= timeoutMs) {
+        return reject(new Error("Monetag SDK failed to load"));
+      }
+      setTimeout(check, intervalMs);
+    })();
+  });
+}
+
 async function showRewardedAd() {
-  const monetagShow = window[CONFIG.MONETAG_SHOW_FN];
-  if (typeof monetagShow === "function") {
-    await monetagShow();
-    return;
-  }
-  if (AdController) {
-    await AdController.show();
-    return;
-  }
-  throw new Error("no ad provider available");
+  const monetagShow = await waitForMonetag();
+  await monetagShow();
 }
 
 function burstCoins() {
@@ -752,7 +752,11 @@ document.getElementById("orbBtn").addEventListener("click", async () => {
     tg?.HapticFeedback?.notificationOccurred("success");
   } catch (e) {
     console.warn("Ad flow error", e);
-    showToast("Ad view was not completed");
+    if (String(e?.message).includes("Monetag SDK failed to load")) {
+      showToast("Ads aren't ready yet, try again in a moment");
+    } else {
+      showToast("Ad view was not completed");
+    }
   }
 });
 

@@ -552,14 +552,33 @@ function initFirebase() {
   db = firebase.firestore();
 }
 
-async function verifySessionOnServer() {
-  const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/auth/verify`, {
+// دمج auth/verify + tasks/list + referrals/list في طلب واحد
+// (/api/bootstrap) بدل 3 رحلات شبكة منفصلة عند فتح التطبيق —
+// هذا يقلل زمن التحميل الفعلي بشكل ملموس.
+async function bootstrapSession() {
+  const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/bootstrap`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
     body: JSON.stringify({ initData: tg?.initData || "" }),
   });
-  if (!res.ok) throw new Error("session verification failed");
-  return res.json();
+  if (!res.ok) throw new Error("bootstrap failed");
+  const data = await res.json();
+
+  if (data.user) {
+    state.coins = data.user.coins || 0;
+    state.balance = data.user.balance || 0;
+    state.viewsToday = data.user.viewsToday || 0;
+    state.totalViews = data.user.totalViews || 0;
+    renderBalance();
+  }
+  if (data.tasks) {
+    tasksCache = data.tasks;
+    renderTasks();
+  }
+  if (data.referralsData) {
+    renderReferrals(data.referralsData);
+  }
+  return data;
 }
 
 /* =========================================================
@@ -571,24 +590,25 @@ async function runSplashSequence() {
   const steps = [
     { pct: 20, label: "Loading Telegram interface…", fn: initTelegram },
     { pct: 45, label: "Connecting to Firebase…", fn: initFirebase },
-    { pct: 70, label: "Verifying session…", fn: async () => {
-        try { await verifySessionOnServer(); }
-        catch (e) { console.warn("verify skipped (backend not configured yet)", e); }
+    { pct: 100, label: "Loading your data…", fn: async () => {
+        try {
+          // نداء واحد فقط للسيرفر يجلب user + tasks + referrals معًا
+          await bootstrapSession();
+        } catch (e) {
+          console.warn("bootstrap skipped (backend not configured yet)", e);
+        }
+        // نفتح مستمع Firestore الحيّ بدون انتظاره — البيانات
+        // الحالية وصلت أصلاً من bootstrapSession، وهذا فقط
+        // لتحديثات لاحقة (بعد مشاهدة إعلان مثلاً)
+        listenToUserDoc();
       }
     },
-    { pct: 92, label: "Loading your data…", fn: async () => {
-        try { await listenToUserDoc(); }
-        catch (e) { console.warn("listenToUserDoc failed", e); }
-      }
-    },
-    { pct: 100, label: "Ready", fn: async () => {} },
   ];
 
   for (const step of steps) {
     status.textContent = step.label;
     await step.fn();
     fill.style.width = step.pct + "%";
-    await new Promise(r => setTimeout(r, 120));
   }
 
   document.getElementById("splash").classList.add("hidden");
@@ -845,6 +865,35 @@ document.getElementById("orbBtn").addEventListener("click", async () => {
    10) Referrals — connected to the server/Firestore
    ========================================================= */
 let currentReferralLink = "";
+function renderReferrals(data) {
+  currentReferralLink = data.referralLink || "";
+  document.getElementById("refLink").textContent = currentReferralLink
+    ? currentReferralLink.replace("https://", "")
+    : "Not available yet";
+  document.getElementById("refCount").textContent = data.referralCount || 0;
+  document.getElementById("refRewardRate").textContent = Math.floor(data.rewardPerReferral) + " " + CONFIG.COIN_TICKER;
+  document.getElementById("refUnclaimed").textContent = Math.floor(data.unclaimedReward).toLocaleString() + " " + CONFIG.COIN_TICKER;
+  document.getElementById("claimRefBtn").disabled = !(data.unclaimedReward > 0);
+
+  const listCard = document.getElementById("refListCard");
+  if (!data.referrals || data.referrals.length === 0) {
+    listCard.innerHTML = '<div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div>';
+  } else {
+    listCard.innerHTML = data.referrals.map(r => {
+      const label = r.username ? "@" + r.username : (r.name || "User");
+      const statusClass = r.rewardClaimed ? "claimed" : (r.status === "active" ? "active" : "pending");
+      const statusText = r.rewardClaimed ? "Claimed" : (r.status === "active" ? "Active" : "Pending");
+      return `
+        <div class="friend-row">
+          <span class="friend-name">${label}</span>
+          <span class="friend-status ${statusClass}">${statusText}</span>
+        </div>`;
+    }).join("");
+  }
+}
+
+// يُستخدم فقط لإعادة التحميل عند فتح تبويب Friends أو بعد Claim —
+// التحميل الأولي عند فتح التطبيق يأتي من bootstrapSession()
 async function loadReferrals() {
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/list`, {
@@ -854,30 +903,7 @@ async function loadReferrals() {
     });
     if (!res.ok) throw new Error("failed to load referrals");
     const data = await res.json();
-    currentReferralLink = data.referralLink || "";
-    document.getElementById("refLink").textContent = currentReferralLink
-      ? currentReferralLink.replace("https://", "")
-      : "Not available yet";
-    document.getElementById("refCount").textContent = data.referralCount || 0;
-    document.getElementById("refRewardRate").textContent = Math.floor(data.rewardPerReferral) + " " + CONFIG.COIN_TICKER;
-    document.getElementById("refUnclaimed").textContent = Math.floor(data.unclaimedReward).toLocaleString() + " " + CONFIG.COIN_TICKER;
-    document.getElementById("claimRefBtn").disabled = !(data.unclaimedReward > 0);
-
-    const listCard = document.getElementById("refListCard");
-    if (!data.referrals || data.referrals.length === 0) {
-      listCard.innerHTML = '<div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div>';
-    } else {
-      listCard.innerHTML = data.referrals.map(r => {
-        const label = r.username ? "@" + r.username : (r.name || "User");
-        const statusClass = r.rewardClaimed ? "claimed" : (r.status === "active" ? "active" : "pending");
-        const statusText = r.rewardClaimed ? "Claimed" : (r.status === "active" ? "Active" : "Pending");
-        return `
-          <div class="friend-row">
-            <span class="friend-name">${label}</span>
-            <span class="friend-status ${statusClass}">${statusText}</span>
-          </div>`;
-      }).join("");
-    }
+    renderReferrals(data);
   } catch (e) {
     console.warn("loadReferrals error", e);
   }
@@ -1248,12 +1274,10 @@ document.addEventListener("dragstart", (e) => {
    15) Entry point
    ========================================================= */
 window.addEventListener("DOMContentLoaded", async () => {
-  await runSplashSequence(); // includes waiting for the real balance to load
+  await runSplashSequence(); // bootstrapSession() inside already loaded user + tasks + referrals in one request
   initAds();
   initTonConnect();
   renderBalance();
-  loadReferrals();
-  loadTasks();
 });
 </script>
 </body>

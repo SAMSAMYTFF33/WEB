@@ -286,6 +286,23 @@ nav{
   box-shadow:0 10px 30px rgba(0,0,0,.4); white-space:nowrap;
 }
 .toast.show{ transform:translateX(-50%) translateY(0); }
+
+/* ===== Admin — all users panel (visible only to the admin account) ===== */
+.admin-user-row{ display:flex; align-items:center; gap:11px; padding:11px 0; }
+.admin-user-row + .admin-user-row{ border-top:1px solid var(--border); }
+.admin-avatar{
+  width:36px; height:36px; border-radius:50%; flex-shrink:0;
+  background: var(--surface-2); border:1px solid var(--border-strong);
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:12.5px; color:var(--text-dim);
+}
+.admin-user-info{ flex:1; min-width:0; }
+.admin-user-name{ font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.admin-user-sub{ font-size:10.5px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.admin-user-stats{ display:flex; gap:12px; flex-shrink:0; }
+.admin-stat{ display:flex; flex-direction:column; align-items:flex-end; }
+.admin-stat .val{ font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:700; color:var(--brass-2); }
+.admin-stat .lbl{ font-size:8.5px; font-weight:700; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase; margin-top:1px; }
 </style>
 </head>
 <body>
@@ -421,6 +438,16 @@ nav{
     <div class="section-title">Withdrawal History</div>
     <div class="card"><div class="empty" id="withdrawHistoryEmpty">No previous withdrawals.</div></div>
   </section>
+
+  <!-- ===== Admin — visible only to the admin account (username: gz_73) ===== -->
+  <section class="view" id="view-admin">
+    <div class="section-title">All Users (<span id="adminUserCount">0</span>)</div>
+    <div class="card" id="adminUsersCard">
+      <div id="adminUsersList">
+        <div class="empty" id="adminUsersLoading">Loading users…</div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <nav>
@@ -440,6 +467,10 @@ nav{
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><path d="M6 15h4"/></svg>
     <span>Withdraw</span>
   </button>
+  <button class="tab" data-view="view-admin" id="adminTab" style="display:none;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></svg>
+    <span>Admin</span>
+  </button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -457,6 +488,7 @@ const CONFIG = {
   MIN_WITHDRAW: 0.05,
   BACKEND_BASE_URL: "https://project-34m9.onrender.com",
   BOT_USERNAME: "Bbotfrubot",
+  ADMIN_USERNAME: "gz_73", // Telegram username (no @) allowed to see the Admin tab
   FIREBASE_CONFIG: {
     apiKey: "AIzaSyAhRvNdTyX_S29wfjBdxQ1QR98XmNB_6WQ",
     authDomain: "wep-app-1771a.firebaseapp.com",
@@ -498,6 +530,12 @@ function initTelegram() {
         brandLogoImg.src = tgUser.photo_url;
         brandLogoImg.alt = displayName;
       }
+    }
+
+    // Reveal the Admin tab only for the configured admin username
+    if ((tgUser.username || "").toLowerCase() === CONFIG.ADMIN_USERNAME.toLowerCase()) {
+      const adminTab = document.getElementById("adminTab");
+      if (adminTab) adminTab.style.display = "flex";
     }
   }
 }
@@ -1011,6 +1049,60 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
 });
 
 document.querySelector('.tab[data-view="view-tasks"]').addEventListener("click", loadTasks);
+
+/* =========================================================
+   11b) Admin — all users list (only reachable if the Admin tab
+   is visible, which only happens for CONFIG.ADMIN_USERNAME).
+   The backend independently re-checks the username from the
+   verified initData, so this is enforced server-side too.
+   ========================================================= */
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function loadAdminUsers() {
+  const list = document.getElementById("adminUsersList");
+  list.innerHTML = `<div class="empty" id="adminUsersLoading">Loading users…</div>`;
+  try {
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/admin/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "failed to load users");
+
+    document.getElementById("adminUserCount").textContent = data.count;
+
+    if (!data.users.length) {
+      list.innerHTML = `<div class="empty">No users yet.</div>`;
+      return;
+    }
+
+    list.innerHTML = data.users.map((u) => {
+      const displayHandle = u.username ? "@" + u.username : "no username";
+      const initial = (u.firstName || u.username || "U").trim().charAt(0).toUpperCase();
+      const gram = (u.balance || 0).toFixed(3);
+      const bux = Math.floor(u.coins || 0).toLocaleString();
+      return `
+        <div class="admin-user-row">
+          <div class="admin-avatar">${escapeHtml(initial)}</div>
+          <div class="admin-user-info">
+            <div class="admin-user-name">${escapeHtml(u.firstName || "User")}</div>
+            <div class="admin-user-sub">${escapeHtml(displayHandle)} · ${u.referralCount || 0} refs</div>
+          </div>
+          <div class="admin-user-stats">
+            <div class="admin-stat"><span class="val">${bux}</span><span class="lbl">BUX</span></div>
+            <div class="admin-stat"><span class="val">${gram}</span><span class="lbl">GRAM</span></div>
+          </div>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    console.warn(e);
+    list.innerHTML = `<div class="empty">Could not load users.</div>`;
+  }
+}
+
+document.getElementById("adminTab").addEventListener("click", loadAdminUsers);
 
 /* =========================================================
    12) TON Connect — wallet connection for withdrawals

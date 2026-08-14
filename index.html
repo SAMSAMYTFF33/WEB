@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>CrypStore 🏹 — Earn $_$ by Watching Ads</title>
+<title>CrypStore 🏹 — Earn BUX by Watching Ads</title>
 <link rel="icon" type="image/png" href="assets/favicon_128.png">
 <link rel="apple-touch-icon" href="assets/logo_512.png">
 <meta property="og:title" content="CrypStore 🏹">
-<meta property="og:description" content="Earn $_$ by watching ads">
+<meta property="og:description" content="Earn BUX by watching ads">
 <meta property="og:image" content="assets/logo_512.png">
 <!-- Telegram WebApp SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -313,11 +313,11 @@ nav{
 
   <div class="balance-card">
     <div class="coin-icon">
-      <img src="assets/logo_2.png" alt="$_$ coin">
+      <img src="assets/logo_1.png" alt="BUX coin">
     </div>
     <div class="balance-mid">
       <div class="balance-label">Current Balance</div>
-      <div class="balance-value mono"><span id="balanceValue">0</span><span class="unit">$_$</span></div>
+      <div class="balance-value mono"><span id="balanceValue">0</span><span class="unit">BUX</span></div>
     </div>
     <div class="balance-usd" id="balanceUsd">= 0.0000 GRAM</div>
   </div>
@@ -332,7 +332,7 @@ nav{
         <div class="dial-core">
           <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15l13-7.5Z"/></svg>
           <div class="cta">Watch Ad</div>
-          <div class="sub">+<b id="adRewardHint">10</b> $_$</div>
+          <div class="sub">+<b id="adRewardHint">10</b> BUX</div>
         </div>
         <div class="burst" id="burst"></div>
       </button>
@@ -341,7 +341,7 @@ nav{
 
     <div class="section-title">Your Stats</div>
     <div class="card">
-      <div class="row"><span class="k">Today's Earnings</span><span class="v mono" id="statToday">0 $_$</span></div>
+      <div class="row"><span class="k">Today's Earnings</span><span class="v mono" id="statToday">0 BUX</span></div>
       <div class="row"><span class="k">Total Views</span><span class="v mono" id="statViews">0</span></div>
       <div class="row"><span class="k">Views Left Today</span><span class="v mono" id="statLeft">20</span></div>
     </div>
@@ -354,15 +354,15 @@ nav{
     <div id="tasksList">
       <div class="empty" id="tasksLoading">Loading tasks…</div>
     </div>
-    <div class="hint">Complete tasks to earn extra $_$. New tasks are added regularly — check back often.</div>
+    <div class="hint">Complete tasks to earn extra BUX. New tasks are added regularly — check back often.</div>
   </section>
 
   <!-- ===== Referrals ===== -->
   <section class="view" id="view-ref">
     <div class="section-title">Invite Friends</div>
     <div class="card">
-      <div class="row"><span class="k">Your reward per active referral</span><span class="v mono" id="refRewardRate">0 $_$</span></div>
-      <div class="row"><span class="k">Unclaimed rewards</span><span class="v mono" id="refUnclaimed">0 $_$</span></div>
+      <div class="row"><span class="k">Your reward per active referral</span><span class="v mono" id="refRewardRate">0 BUX</span></div>
+      <div class="row"><span class="k">Unclaimed rewards</span><span class="v mono" id="refUnclaimed">0 BUX</span></div>
     </div>
     <button class="btn btn-primary" id="claimRefBtn" disabled>Claim Reward</button>
 
@@ -377,12 +377,12 @@ nav{
 
   <!-- ===== Withdraw ===== -->
   <section class="view" id="view-withdraw">
-    <div class="section-title">Convert $_$ → GRAM</div>
+    <div class="section-title">Convert BUX → GRAM</div>
     <div class="card">
-      <div class="row"><span class="k">Available</span><span class="v mono" id="convertAvailable">0 $_$</span></div>
-      <div class="row"><span class="k">Rate</span><span class="v mono">10,000 $_$ = 1 GRAM</span></div>
+      <div class="row"><span class="k">Available</span><span class="v mono" id="convertAvailable">0 BUX</span></div>
+      <div class="row"><span class="k">Rate</span><span class="v mono">10,000 BUX = 1 GRAM</span></div>
     </div>
-    <input class="input" id="convertAmount" placeholder="Amount ($_$)" dir="ltr" inputmode="numeric">
+    <input class="input" id="convertAmount" placeholder="Amount (BUX)" dir="ltr" inputmode="numeric">
     <button class="btn btn-primary" id="convertBtn">Convert</button>
 
     <div class="section-title">Withdraw Earnings</div>
@@ -452,9 +452,9 @@ nav{
 const CONFIG = {
   ADSGRAM_BLOCK_ID: "int-00000",
   DAILY_AD_LIMIT: 20,
-  COIN_TICKER: "$_$",
+  COIN_TICKER: "BUX",
   COIN_PER_AD: 10,
-  COINS_PER_GRAM: 10000, // 10,000 $_$ = 1 GRAM
+  COINS_PER_GRAM: 10000, // 10,000 BUX = 1 GRAM
   MIN_WITHDRAW: 0.2,
   BACKEND_BASE_URL: "https://project-34m9.onrender.com",
   BOT_USERNAME: "Bbotfrubot",
@@ -848,7 +848,7 @@ function renderTasks() {
               <div class="task-title">${task.title}</div>
               <div class="task-sub">${task.description}</div>
             </div>
-            <div class="task-reward">+${rewardStr}<span>$_$</span></div>
+            <div class="task-reward">+${rewardStr}<span>BUX</span></div>
           </div>
           <div class="task-done">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
@@ -864,7 +864,7 @@ function renderTasks() {
             <div class="task-title">${task.title}</div>
             <div class="task-sub">${task.description}</div>
           </div>
-          <div class="task-reward">+${rewardStr}<span>$_$</span></div>
+          <div class="task-reward">+${rewardStr}<span>BUX</span></div>
         </div>
         <div class="task-actions">
           <button class="btn btn-primary task-open-btn" data-url="${task.actionUrl}">Join Channel</button>
@@ -924,7 +924,7 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
       if (!res.ok) throw new Error(data.error || "verification failed");
 
       if (data.verified) {
-        showToast(data.alreadyClaimed ? "Task already completed" : `Task complete! +${data.reward ?? ""} $_$`.trim());
+        showToast(data.alreadyClaimed ? "Task already completed" : `Task complete! +${data.reward ?? ""} BUX`.trim());
         if (!data.alreadyClaimed) {
           playClaimSound();
           tg?.HapticFeedback?.notificationOccurred("success");
@@ -1011,12 +1011,12 @@ document.getElementById("disconnectWalletBtn").addEventListener("click", async (
 });
 
 /* =========================================================
-   12b) Convert — $_$ to GRAM, only place GRAM is touched client-side
+   12b) Convert — BUX to GRAM, only place GRAM is touched client-side
    ========================================================= */
 document.getElementById("convertBtn").addEventListener("click", async () => {
   const amount = Math.floor(parseFloat(document.getElementById("convertAmount").value));
-  if (!amount || amount <= 0) { showToast("Enter a valid $_$ amount"); return; }
-  if (amount > state.coins) { showToast("Insufficient $_$ balance"); return; }
+  if (!amount || amount <= 0) { showToast("Enter a valid BUX amount"); return; }
+  if (amount > state.coins) { showToast("Insufficient BUX balance"); return; }
 
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/convert`, {
@@ -1031,7 +1031,7 @@ document.getElementById("convertBtn").addEventListener("click", async () => {
     state.balance += data.gram;
     renderBalance();
     document.getElementById("convertAmount").value = "";
-    showToast(`Converted ${data.converted} $_$ → ${data.gram.toFixed(4)} GRAM`);
+    showToast(`Converted ${data.converted} BUX → ${data.gram.toFixed(4)} GRAM`);
     playClaimSound();
     tg?.HapticFeedback?.notificationOccurred("success");
   } catch (e) {

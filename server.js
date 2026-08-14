@@ -146,12 +146,13 @@ async function createUniqueReferralCode() {
 }
 
 // =========================================================
-// POST /api/auth/verify
-// يتحقق من initData وينشئ مستند المستخدم إذا ما كان موجود
+// ensureUserDoc(tgUser)
+// المنطق المشترك: يتحقق من initData وينشئ مستند المستخدم إذا ما
+// كان موجود، ويرجّع بيانات المستخدم الحالية. مستخدَم من
+// /api/auth/verify و /api/bootstrap لتفادي تكرار المنطق.
 // =========================================================
-app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
+async function ensureUserDoc(tgUser) {
+    const userId = String(tgUser.id);
     const ref = db.collection("users").doc(userId);
     const doc = await ref.get();
 
@@ -170,8 +171,8 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
 
       await db.runTransaction(async (tx) => {
         tx.set(ref, {
-          firstName: req.tgUser.first_name || "",
-          username: req.tgUser.username || "",
+          firstName: tgUser.first_name || "",
+          username: tgUser.username || "",
           coins: 0,
           balance: 0,
           viewsToday: 0,
@@ -189,8 +190,8 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
           tx.set(referralDocRef, {
             referrerId,
             refereeId: userId,
-            refereeName: req.tgUser.first_name || "",
-            refereeUsername: req.tgUser.username || "",
+            refereeName: tgUser.first_name || "",
+            refereeUsername: tgUser.username || "",
             status: "active", // نشطة فورًا لأنه هذا الاستدعاء بحد ذاته يعني المستخدم فتح التطبيق فعليًا
             rewardClaimed: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -208,8 +209,8 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
       if (referrerId) {
         const notif =
           `A referral has been confirmed and is now Active!\n\n` +
-          `Name: ${req.tgUser.first_name || "N/A"}\n` +
-          `Username: ${req.tgUser.username ? "@" + req.tgUser.username : "N/A"}\n` +
+          `Name: ${tgUser.first_name || "N/A"}\n` +
+          `Username: ${tgUser.username ? "@" + tgUser.username : "N/A"}\n` +
           `Telegram ID: ${userId}\n\n` +
           `Go to the Friends section and claim your reward.`;
         await sendTelegramMessage(referrerId, notif);
@@ -224,7 +225,78 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
     }
 
     const fresh = await ref.get();
-    res.json({ ok: true, user: fresh.data() });
+    return fresh.data();
+}
+
+// =========================================================
+// POST /api/auth/verify
+// يتحقق من initData وينشئ مستند المستخدم إذا ما كان موجود
+// (مُبقاة للتوافق مع أي استدعاء قديم؛ الواجهة الحالية تستخدم
+// /api/bootstrap بدلاً منها لتقليل عدد رحلات الشبكة)
+// =========================================================
+app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
+  try {
+    const user = await ensureUserDoc(req.tgUser);
+    res.json({ ok: true, user });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// =========================================================
+// POST /api/bootstrap
+// يجمع auth/verify + tasks/list + referrals/list في طلب واحد
+// فقط، بدل 3 رحلات شبكة منفصلة عند فتح التطبيق. هذا هو
+// الاستدعاء الذي تستخدمه الواجهة الأمامية عند التشغيل.
+// =========================================================
+app.post("/api/bootstrap", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const userData = await ensureUserDoc(req.tgUser);
+
+    // استعلام الإحالات وحساب المهام يعتمدان فقط على بيانات
+    // موجودة أصلاً (userData) أو استعلام واحد إضافي — لا حاجة
+    // لقراءة مستند المستخدم مرة أخرى.
+    const referralsSnap = await db.collection("referrals").where("referrerId", "==", userId).get();
+    const referrals = [];
+    let unclaimedCount = 0;
+    referralsSnap.forEach((d) => {
+      const r = d.data();
+      referrals.push({
+        id: d.id,
+        name: r.refereeName,
+        username: r.refereeUsername,
+        status: r.status,
+        rewardClaimed: r.rewardClaimed,
+      });
+      if (r.status === "active" && !r.rewardClaimed) unclaimedCount++;
+    });
+
+    const tasksClaimed = userData.tasksClaimed || {};
+    const tasks = TASKS.map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      icon: t.icon,
+      actionUrl: t.actionUrl,
+      reward: t.reward,
+      completed: !!tasksClaimed[t.id],
+    }));
+
+    res.json({
+      ok: true,
+      user: userData,
+      referralsData: {
+        referralCode: userData.referralCode || null,
+        referralLink: userData.referralCode ? `https://t.me/${BOT_USERNAME}?start=${userData.referralCode}` : null,
+        referralCount: userData.referralCount || 0,
+        referrals,
+        unclaimedReward: +(unclaimedCount * COIN_PER_REFERRAL).toFixed(6),
+        rewardPerReferral: COIN_PER_REFERRAL,
+      },
+      tasks,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "internal error" });

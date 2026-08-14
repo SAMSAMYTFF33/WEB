@@ -1,24 +1,4 @@
-/**
- * CrypStore 🏹 Backend — Express + Firebase Admin SDK
- * ------------------------------------------------
- * هذا السيرفر هو المكان الوحيد المسموح له بالكتابة على Firestore.
- * الواجهة الأمامية (index.html) لا تكتب على قاعدة البيانات مباشرة أبدًا.
- *
- * متغيرات البيئة المطلوبة (Render → Environment، أو Railway → Variables):
- * - BOT_TOKEN               : توكن بوت تيليجرام من BotFather
- * - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
- *                               Firebase Console > Project settings > Service accounts
- * - COIN_PER_AD             : (اختياري) مكافأة $_$ لكل إعلان، افتراضي 10
- * - COIN_PER_REFERRAL       : (اختياري) مكافأة $_$ لكل إحالة نشطة، افتراضي 15
- * - COINS_PER_GRAM          : (اختياري) معدل التحويل، افتراضي 10000 (10,000 $_$ = 1 GRAM)
- * - DAILY_AD_LIMIT          : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
- * - MIN_WITHDRAW            : (اختياري) حد أدنى السحب بـ GRAM، افتراضي 0.2
- * - WEBAPP_URL              : رابط GitHub Pages (مثلاً https://samsamytff33.github.io/WEB/)
- * - BOT_USERNAME            : يوزر البوت بدون @ (لبناء روابط الإحالة) — الآن CrypStorebot
- * - TELEGRAM_WEBHOOK_SECRET : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
- *                               الطلبات الواردة على /api/telegram/webhook
- *                               فعليًا من تيليجرام وليس من أي جهة أخرى
- */
+
 
 const express = require("express");
 const cors = require("cors");
@@ -50,12 +30,12 @@ const WEBAPP_URL = process.env.WEBAPP_URL || "https://samsamytff33.github.io/WEB
 const BOT_USERNAME = process.env.BOT_USERNAME || "CrypStorebot";
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 
-// ---------- عملة $_$ (العملة الافتراضية داخل التطبيق) ----------
-// كل الأرصدة اليومية (إعلانات، إحالات، مهام) تُمنح بعملة $_$.
-// GRAM لا يظهر إلا في صفحة السحب، بعد تحويل $_$ إليه.
+// ---------- عملة BUX (العملة الافتراضية داخل التطبيق) ----------
+// كل الأرصدة اليومية (إعلانات، إحالات، مهام) تُمنح بعملة BUX.
+// GRAM لا يظهر إلا في صفحة السحب، بعد تحويل BUX إليه.
 const COIN_PER_AD = parseFloat(process.env.COIN_PER_AD || "10");
 const COIN_PER_REFERRAL = parseFloat(process.env.COIN_PER_REFERRAL || "15");
-const COINS_PER_GRAM = parseFloat(process.env.COINS_PER_GRAM || "10000"); // 10,000 $_$ = 1 GRAM
+const COINS_PER_GRAM = parseFloat(process.env.COINS_PER_GRAM || "10000"); // 10,000 BUX = 1 GRAM
 
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -74,7 +54,7 @@ const TASKS = [
     icon: "🪶",
     actionUrl: "https://t.me/CrypStore1",
     channelUsername: "CrypStore1", // without @ — bot must be a member/admin of this channel
-    reward: parseFloat(process.env.TASK_JOIN_CHANNEL_REWARD || "15"), // بعملة $_$
+    reward: parseFloat(process.env.TASK_JOIN_CHANNEL_REWARD || "15"), // بعملة BUX
   },
 ];
 
@@ -326,9 +306,9 @@ app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
 
 // =========================================================
 // POST /api/convert
-// يحوّل رصيد $_$ إلى GRAM بمعدل ثابت (COINS_PER_GRAM). فقط هنا
-// يظهر GRAM؛ باقي التطبيق يتعامل بعملة $_$ حصرًا.
-// body: { amount } — بعملة $_$
+// يحوّل رصيد BUX إلى GRAM بمعدل ثابت (COINS_PER_GRAM). فقط هنا
+// يظهر GRAM؛ باقي التطبيق يتعامل بعملة BUX حصرًا.
+// body: { amount } — بعملة BUX
 // =========================================================
 app.post("/api/convert", requireTelegramAuth, async (req, res) => {
   try {
@@ -345,7 +325,7 @@ app.post("/api/convert", requireTelegramAuth, async (req, res) => {
       const doc = await tx.get(userRef);
       if (!doc.exists) throw new Error("user not found");
       const coins = doc.data().coins || 0;
-      if (coinsAmount > coins) throw new Error("insufficient $_$ balance");
+      if (coinsAmount > coins) throw new Error("insufficient BUX balance");
 
       tx.update(userRef, {
         coins: admin.firestore.FieldValue.increment(-coinsAmount),
@@ -478,9 +458,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
         // رسالة ترحيب مختصرة واحترافية عند /start — تحمل اسم وهوية CrypStore 🏹
         const welcomeCaption =
           `🏹 <b>Welcome to CrypStore, ${firstName}!</b>\n\n` +
-          `⛏ Earn ${COIN_PER_AD} $_$ per ad\n` +
-          `🤝 ${COIN_PER_REFERRAL} $_$ per invite\n` +
-          `💸 Convert $_$ to GRAM and withdraw anytime`;
+          `⛏ Earn ${COIN_PER_AD} BUX per ad\n` +
+          `🤝 ${COIN_PER_REFERRAL} BUX per invite\n` +
+          `💸 Convert BUX to GRAM and withdraw anytime`;
 
         const replyMarkup = {
           inline_keyboard: [

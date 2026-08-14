@@ -122,19 +122,20 @@ header{
 .balance-card{
   position:relative; overflow:hidden;
   background: linear-gradient(160deg, var(--surface-2), var(--surface));
-  border:1px solid var(--border); border-radius:16px; padding:18px 20px;
-  display:flex; align-items:center; justify-content:space-between;
+  border:1px solid var(--border); border-radius:14px; padding:11px 14px;
+  display:flex; align-items:center; gap:12px;
 }
 .balance-card::before{
-  content:""; position:absolute; inset-inline-end:-40px; top:-40px; width:140px; height:140px; border-radius:50%;
-  background: radial-gradient(circle, rgba(198,162,92,.10), transparent 70%);
+  content:""; position:absolute; inset-inline-end:-30px; top:-30px; width:100px; height:100px; border-radius:50%;
+  background: radial-gradient(circle, rgba(198,162,92,.09), transparent 70%);
 }
-.balance-label{ font-size:11px; color:var(--text-muted); margin-bottom:8px; letter-spacing:.3px; }
-.balance-value{ font-size:27px; font-weight:800; display:flex; align-items:baseline; gap:7px; letter-spacing:-.3px; }
-.balance-value .unit{ font-size:12px; color:var(--brass); font-weight:700; letter-spacing:.5px; }
-.balance-usd{ font-size:11px; color:var(--text-muted); margin-top:6px; }
+.balance-mid{ flex:1; min-width:0; position:relative; z-index:1; }
+.balance-label{ font-size:10px; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase; }
+.balance-value{ font-size:19px; font-weight:800; display:flex; align-items:baseline; gap:6px; letter-spacing:-.2px; margin-top:1px; }
+.balance-value .unit{ font-size:11px; color:var(--brass); font-weight:700; letter-spacing:.4px; }
+.balance-usd{ font-size:10.5px; color:var(--text-muted); position:relative; z-index:1; flex-shrink:0; }
 .coin-icon{
-  width:42px; height:42px; position:relative; z-index:1;
+  width:34px; height:34px; position:relative; z-index:1;
   border-radius:50%; overflow:hidden; flex-shrink:0;
   background: var(--surface-2);
   border:1.5px solid transparent;
@@ -311,14 +312,14 @@ nav{
   </div>
 
   <div class="balance-card">
-    <div>
-      <div class="balance-label">Current Balance</div>
-      <div class="balance-value mono"><span id="balanceValue">0.000</span><span class="unit">GRAM</span></div>
-      <div class="balance-usd" id="balanceUsd">≈ $0.00</div>
-    </div>
     <div class="coin-icon">
       <img src="assets/logo_1.png" alt="CrypStore logo">
     </div>
+    <div class="balance-mid">
+      <div class="balance-label">Current Balance</div>
+      <div class="balance-value mono"><span id="balanceValue">0.000</span><span class="unit">GRAM</span></div>
+    </div>
+    <div class="balance-usd" id="balanceUsd">≈ $0.00</div>
   </div>
 </header>
 
@@ -522,10 +523,15 @@ async function runSplashSequence() {
   const status = document.getElementById("splashStatus");
   const steps = [
     { pct: 20, label: "Loading Telegram interface…", fn: initTelegram },
-    { pct: 50, label: "Connecting to Firebase…", fn: initFirebase },
-    { pct: 85, label: "Verifying session…", fn: async () => {
+    { pct: 45, label: "Connecting to Firebase…", fn: initFirebase },
+    { pct: 70, label: "Verifying session…", fn: async () => {
         try { await verifySessionOnServer(); }
         catch (e) { console.warn("verify skipped (backend not configured yet)", e); }
+      }
+    },
+    { pct: 92, label: "Loading your data…", fn: async () => {
+        try { await listenToUserDoc(); }
+        catch (e) { console.warn("listenToUserDoc failed", e); }
       }
     },
     { pct: 100, label: "Ready", fn: async () => {} },
@@ -635,18 +641,35 @@ function renderBalance() {
 
 /* =========================================================
    8) Listen for balance updates from Firestore (after the server verifies initData)
+   Returns a promise that resolves once the FIRST snapshot arrives,
+   so the splash screen can wait for real data before revealing the
+   app — this avoids the "0 → real balance" flash on Home.
+   A safety timeout prevents the splash from hanging forever if
+   Firestore is slow/offline.
    ========================================================= */
 function listenToUserDoc() {
-  if (!db || !tgUser) return;
-  db.collection("users").doc(String(tgUser.id))
-    .onSnapshot(doc => {
-      if (!doc.exists) return;
-      const d = doc.data();
-      state.balance = d.balance || 0;
-      state.viewsToday = d.viewsToday || 0;
-      state.totalViews = d.totalViews || 0;
-      renderBalance();
-    }, err => console.warn("Firestore listen error", err));
+  return new Promise((resolve) => {
+    if (!db || !tgUser) { resolve(); return; }
+    let settled = false;
+    const settle = () => { if (!settled) { settled = true; resolve(); } };
+
+    db.collection("users").doc(String(tgUser.id))
+      .onSnapshot(doc => {
+        if (doc.exists) {
+          const d = doc.data();
+          state.balance = d.balance || 0;
+          state.viewsToday = d.viewsToday || 0;
+          state.totalViews = d.totalViews || 0;
+          renderBalance();
+        }
+        settle();
+      }, err => {
+        console.warn("Firestore listen error", err);
+        settle();
+      });
+
+    setTimeout(settle, 4000); // don't block app startup indefinitely
+  });
 }
 
 /* =========================================================
@@ -1018,10 +1041,9 @@ document.addEventListener("dragstart", (e) => {
    15) Entry point
    ========================================================= */
 window.addEventListener("DOMContentLoaded", async () => {
-  await runSplashSequence();
+  await runSplashSequence(); // includes waiting for the real balance to load
   initAds();
   initTonConnect();
-  listenToUserDoc();
   renderBalance();
   loadReferrals();
   loadTasks();

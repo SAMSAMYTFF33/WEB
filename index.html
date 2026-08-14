@@ -229,7 +229,6 @@ main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .empty{ text-align:center; padding:28px 10px; color:var(--text-muted); font-size:12.5px; line-height:1.7; }
-.mining-card{ background: linear-gradient(160deg, #131b17, var(--surface)); border-color: rgba(78,157,120,.16); }
 .rate-pill{
   display:inline-flex; align-items:center; gap:6px; background: var(--success-bg); color:#8fd0ac;
   padding:5px 11px; border-radius:8px; font-size:11px; font-weight:700; letter-spacing:.2px;
@@ -244,6 +243,21 @@ main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
 .friend-status.active{ background: var(--success-bg); color:#8fd0ac; }
 .friend-status.claimed{ background: var(--surface-2); color:var(--text-muted); }
 .friend-status.pending{ background: rgba(198,162,92,.12); color:var(--brass-2); }
+
+/* ===== Tasks ===== */
+.task-item{ display:flex; align-items:center; gap:12px; }
+.task-icon{
+  width:40px; height:40px; border-radius:12px; flex-shrink:0;
+  background:var(--surface-2); border:1px solid var(--border-strong);
+  display:flex; align-items:center; justify-content:center; color:var(--brass-2);
+}
+.task-icon svg{ width:19px; height:19px; }
+.task-main{ flex:1; min-width:0; }
+.task-title{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.task-reward{ font-size:11.5px; color:var(--brass-2); font-family:'IBM Plex Mono', monospace; margin-top:3px; }
+.task-actions{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; width:104px; }
+.task-actions .btn{ padding:9px; font-size:11.5px; width:100%; }
+
 nav{
   position:fixed; bottom:0; left:0; right:0; background: rgba(10,13,18,.94); backdrop-filter: blur(16px);
   border-top:1px solid var(--border); padding: 9px 12px calc(9px + var(--safe-bottom)); display:flex; gap:2px; z-index:20;
@@ -328,29 +342,13 @@ nav{
     <div class="hint">The daily view limit resets every 24 hours. Rewards are only credited after the server confirms the ad view was completed.</div>
   </section>
 
-  <!-- ===== Mining ===== -->
-  <section class="view" id="view-mining">
-    <div class="section-title">Auto Mining</div>
-    <div class="card mining-card">
-      <div class="row">
-        <span class="k">Mining Rate</span>
-        <span class="rate-pill">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
-          0.0004 TON / hour
-        </span>
-      </div>
-      <div class="row"><span class="k">Unclaimed Mined Balance</span><span class="v mono" id="miningPending">0.0000 TON</span></div>
-      <div class="row"><span class="k">Time Until Cap</span><span class="v mono" id="miningTimer">04:00:00</span></div>
+  <!-- ===== Tasks ===== -->
+  <section class="view" id="view-tasks">
+    <div class="section-title">Available Tasks</div>
+    <div class="card" id="tasksListCard">
+      <div class="empty">Loading tasks…</div>
     </div>
-    <button class="btn btn-primary" id="claimMiningBtn">Claim Earnings</button>
-    <div class="hint">Mining automatically stops once it reaches the storage cap — open the app to claim your balance and restart it.</div>
-
-    <div class="section-title">Boost Mining Speed</div>
-    <div class="card">
-      <div class="row"><span class="k">Current Level</span><span class="v">1</span></div>
-      <div class="row"><span class="k">Next Upgrade</span><span class="v">×1.5 Speed</span></div>
-    </div>
-    <button class="btn btn-ghost" id="boostBtn">Watch an ad to boost speed for 3 hours</button>
+    <div class="hint">Task rewards are only credited once the server verifies you've actually joined — tapping Verify alone isn't enough.</div>
   </section>
 
   <!-- ===== Referrals ===== -->
@@ -417,9 +415,9 @@ nav{
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
     <span>Home</span>
   </button>
-  <button class="tab" data-view="view-mining">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M7 3v2M12 3v2M17 3v2M7 19v2M12 19v2M17 19v2M3 7h2M3 12h2M3 17h2M19 7h2M19 12h2M19 17h2"/></svg>
-    <span>Mining</span>
+  <button class="tab" data-view="view-tasks">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M8 10.5 10.5 13 16 8"/></svg>
+    <span>Tasks</span>
   </button>
   <button class="tab" data-view="view-ref">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.2c2.2.5 3.8 2.2 3.8 5.8"/></svg>
@@ -700,7 +698,130 @@ document.getElementById("orbBtn").addEventListener("click", async () => {
 });
 
 /* =========================================================
-   10) Referrals — connected to the server/Firestore
+   10) Tasks — real list from the server; a task is only credited
+   once the server verifies it server-side (e.g. actual channel
+   membership via the Bot API), not just because Verify was tapped.
+   ========================================================= */
+let tasksState = [];
+const openedTasks = new Set(); // task ids the user tapped "Open Channel" for this session
+
+async function loadTasks() {
+  const card = document.getElementById("tasksListCard");
+  try {
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error("failed to load tasks");
+    const data = await res.json();
+    tasksState = data.tasks || [];
+    renderTasks();
+  } catch (e) {
+    console.warn("loadTasks error", e);
+    card.innerHTML = '<div class="empty">Couldn\u2019t load tasks right now.</div>';
+  }
+}
+
+function renderTasks() {
+  const card = document.getElementById("tasksListCard");
+  if (!tasksState.length) {
+    card.innerHTML = '<div class="empty">No tasks available right now.</div>';
+    return;
+  }
+  card.innerHTML = "";
+  tasksState.forEach((task, i) => {
+    const item = document.createElement("div");
+    item.className = "task-item";
+    if (i > 0) item.style.borderTop = "1px solid var(--border)";
+    item.style.padding = "12px 0";
+
+    const icon = document.createElement("div");
+    icon.className = "task-icon";
+    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>';
+
+    const main = document.createElement("div");
+    main.className = "task-main";
+    const title = document.createElement("div");
+    title.className = "task-title";
+    title.textContent = task.title;
+    const reward = document.createElement("div");
+    reward.className = "task-reward";
+    reward.textContent = `+${Number(task.reward).toFixed(3)} TON`;
+    main.appendChild(title);
+    main.appendChild(reward);
+
+    item.appendChild(icon);
+    item.appendChild(main);
+
+    if (task.completed) {
+      const badge = document.createElement("span");
+      badge.className = "friend-status claimed";
+      badge.textContent = "Completed";
+      item.appendChild(badge);
+    } else {
+      const actions = document.createElement("div");
+      actions.className = "task-actions";
+
+      const openBtn = document.createElement("button");
+      openBtn.className = "btn btn-ghost";
+      openBtn.textContent = "Open Channel";
+      openBtn.addEventListener("click", () => {
+        if (tg?.openTelegramLink) tg.openTelegramLink(task.channelLink);
+        else window.open(task.channelLink, "_blank");
+        openedTasks.add(task.id);
+        verifyBtn.disabled = false;
+      });
+
+      const verifyBtn = document.createElement("button");
+      verifyBtn.className = "btn btn-primary";
+      verifyBtn.textContent = "Verify";
+      verifyBtn.disabled = !openedTasks.has(task.id);
+      verifyBtn.addEventListener("click", () => verifyTask(task.id, verifyBtn));
+
+      actions.appendChild(openBtn);
+      actions.appendChild(verifyBtn);
+      item.appendChild(actions);
+    }
+
+    card.appendChild(item);
+  });
+}
+
+async function verifyTask(taskId, btnEl) {
+  btnEl.disabled = true;
+  const originalLabel = btnEl.textContent;
+  btnEl.textContent = "Checking…";
+  try {
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({ taskId }),
+    });
+    if (!res.ok) throw new Error("verify failed");
+    const data = await res.json();
+    if (data.verified || data.alreadyCompleted) {
+      const amount = Number(data.reward || 0).toFixed(3);
+      showToast(data.alreadyCompleted ? "Task already completed" : `Task verified (+${amount} TON)`);
+      if (!data.alreadyCompleted) playClaimSound();
+      await loadTasks();
+    } else {
+      showToast("We couldn't find your subscription yet — join the channel, then try again");
+      btnEl.disabled = false;
+      btnEl.textContent = originalLabel;
+    }
+  } catch (e) {
+    console.warn(e);
+    showToast("Couldn't verify right now, try again later");
+    btnEl.disabled = false;
+    btnEl.textContent = originalLabel;
+  }
+}
+
+document.querySelector('.tab[data-view="view-tasks"]').addEventListener("click", loadTasks);
+
+/* =========================================================
+   11) Referrals — connected to the server/Firestore
    ========================================================= */
 let currentReferralLink = "";
 async function loadReferrals() {
@@ -776,7 +897,7 @@ document.getElementById("claimRefBtn").addEventListener("click", async () => {
 document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", loadReferrals);
 
 /* =========================================================
-   11) TON Connect — wallet connection for withdrawals
+   12) TON Connect — wallet connection for withdrawals
    Replaces manual address paste with a native wallet connect
    flow (Tonkeeper, MyTonWallet, etc). The connected wallet's
    address is used automatically when requesting a withdrawal.
@@ -838,7 +959,7 @@ document.getElementById("disconnectWalletBtn").addEventListener("click", async (
 });
 
 /* =========================================================
-   12) Withdraw — the client never signs a transaction, it only sends a request to the server
+   13) Withdraw — the client never signs a transaction, it only sends a request to the server
    ========================================================= */
 document.getElementById("withdrawBtn").addEventListener("click", async () => {
   const wallet = connectedWalletAddress;
@@ -862,7 +983,7 @@ document.getElementById("withdrawBtn").addEventListener("click", async () => {
 });
 
 /* =========================================================
-   13) Disable copy / long-press context menu / text selection
+   14) Disable copy / long-press context menu / text selection
    Applies everywhere except inputs & textareas (wallet address,
    withdraw amount) which must stay copy/paste-able.
    ========================================================= */
@@ -886,7 +1007,7 @@ document.addEventListener("dragstart", (e) => {
 });
 
 /* =========================================================
-   14) Entry point
+   15) Entry point
    ========================================================= */
 window.addEventListener("DOMContentLoaded", async () => {
   await runSplashSequence();
@@ -895,6 +1016,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   listenToUserDoc();
   renderBalance();
   loadReferrals();
+  loadTasks();
 });
 </script>
 </body>

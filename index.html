@@ -380,7 +380,6 @@ nav{
     <div class="section-title">Convert BUX → GRAM</div>
     <div class="card">
       <div class="row"><span class="k">Available</span><span class="v mono" id="convertAvailable">0 BUX</span></div>
-      <div class="row"><span class="k">Rate</span><span class="v mono">10,000 BUX = 1 GRAM</span></div>
     </div>
     <input class="input" id="convertAmount" placeholder="Amount (BUX)" dir="ltr" inputmode="numeric">
     <button class="btn btn-primary" id="convertBtn">Convert</button>
@@ -388,7 +387,7 @@ nav{
     <div class="section-title">Withdraw Earnings</div>
     <div class="card">
       <div class="row"><span class="k">Withdrawable Balance</span><span class="v mono" id="withdrawableBalance">0.000 GRAM</span></div>
-      <div class="row"><span class="k">Minimum Withdrawal</span><span class="v mono">0.200 GRAM</span></div>
+      <div class="row"><span class="k">Minimum Withdrawal</span><span class="v mono">0.050 GRAM</span></div>
     </div>
 
     <div class="section-title">Destination Wallet</div>
@@ -454,8 +453,8 @@ const CONFIG = {
   DAILY_AD_LIMIT: 20,
   COIN_TICKER: "BUX",
   COIN_PER_AD: 10,
-  COINS_PER_GRAM: 10000, // 10,000 BUX = 1 GRAM
-  MIN_WITHDRAW: 0.2,
+  COINS_PER_GRAM: 6666.6667, // 10 BUX = 0.0015 GRAM  →  1 GRAM = 6666.6667 BUX
+  MIN_WITHDRAW: 0.05,
   BACKEND_BASE_URL: "https://project-34m9.onrender.com",
   BOT_USERNAME: "Bbotfrubot",
   FIREBASE_CONFIG: {
@@ -711,9 +710,34 @@ function waitForMonetag(timeoutMs = 8000, intervalMs = 150) {
   });
 }
 
+function makeYmid() {
+  // Unique id per ad attempt. Sent to Monetag (appears in their S2S postback)
+  // AND to our own backend, so the two can be matched up — this is what
+  // lets the server tell a *real, paid* ad view apart from a bare fetch()
+  // call someone fires from devtools without ever seeing an ad.
+  return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+}
+
+// Shows one Rewarded Interstitial and returns { ymid, elapsedMs }.
+// Rejects if the SDK errors out OR if the ad closes suspiciously fast
+// (a genuine interstitial takes several seconds to render and be watched;
+// a near-instant resolve is a strong signal of a stub/fallback/no-fill event).
 async function showRewardedAd() {
   const monetagShow = await waitForMonetag();
-  await monetagShow();
+  const ymid = makeYmid();
+  const startedAt = Date.now();
+
+  // Preload first, then show — this is Monetag's own recommended pattern
+  // and avoids ads that "resolve" instantly because nothing had loaded yet.
+  await monetagShow({ type: "preload", ymid });
+  await monetagShow({ ymid });
+
+  const elapsedMs = Date.now() - startedAt;
+  const MIN_PLAUSIBLE_MS = 3000; // a real interstitial can't be watched+closed faster than this
+  if (elapsedMs < MIN_PLAUSIBLE_MS) {
+    throw new Error("Ad closed too quickly to be a genuine view");
+  }
+  return { ymid, elapsedMs };
 }
 
 function burstCoins() {
@@ -732,11 +756,18 @@ function burstCoins() {
   }
 }
 
-async function confirmAdViewOnServer() {
+// IMPORTANT: this call only tells the backend "the SDK promise resolved for
+// this ymid". It must NOT be the thing that credits BUX. The backend has to
+// treat this as a pending/unconfirmed claim and only actually credit the
+// balance once Monetag's own server-to-server postback arrives for the same
+// ymid with reward_event_type=valued. See the note below the code for the
+// exact postback setup — without it, this endpoint alone can still be
+// called directly (Postman/devtools) to farm free rewards.
+async function confirmAdViewOnServer(ymid) {
   const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/ads/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ ymid }),
   });
   if (!res.ok) throw new Error("ad confirmation failed");
   return res.json();
@@ -744,19 +775,31 @@ async function confirmAdViewOnServer() {
 
 document.getElementById("orbBtn").addEventListener("click", async () => {
   if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) { showToast("You've reached today's limit"); return; }
+  const btn = document.getElementById("orbBtn");
+  btn.disabled = true;
   try {
-    await showRewardedAd();
-    await confirmAdViewOnServer();
-    burstCoins();
-    playCoinSound();
-    tg?.HapticFeedback?.notificationOccurred("success");
+    const { ymid } = await showRewardedAd();
+    const data = await confirmAdViewOnServer(ymid);
+    if (data?.pending) {
+      // Backend is waiting on Monetag's postback before crediting — don't
+      // celebrate yet, just tell the user honestly.
+      showToast("Ad watched — reward will appear shortly");
+    } else {
+      burstCoins();
+      playCoinSound();
+      tg?.HapticFeedback?.notificationOccurred("success");
+    }
   } catch (e) {
     console.warn("Ad flow error", e);
     if (String(e?.message).includes("Monetag SDK failed to load")) {
       showToast("Ads aren't ready yet, try again in a moment");
+    } else if (String(e?.message).includes("too quickly")) {
+      showToast("Ad view could not be verified, try again");
     } else {
       showToast("Ad view was not completed");
     }
+  } finally {
+    btn.disabled = state.viewsToday >= CONFIG.DAILY_AD_LIMIT;
   }
 });
 

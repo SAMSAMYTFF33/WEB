@@ -8,12 +8,13 @@
  * - BOT_TOKEN               : توكن بوت تيليجرام من BotFather
  * - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
  *                               Firebase Console > Project settings > Service accounts
- * - REWARD_PER_AD           : (اختياري) قيمة المكافأة لكل إعلان، افتراضي 0.002
+ * - COIN_PER_AD             : (اختياري) مكافأة $_$ لكل إعلان، افتراضي 10
+ * - COIN_PER_REFERRAL       : (اختياري) مكافأة $_$ لكل إحالة نشطة، افتراضي 15
+ * - COINS_PER_GRAM          : (اختياري) معدل التحويل، افتراضي 10000 (10,000 $_$ = 1 GRAM)
  * - DAILY_AD_LIMIT          : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
- * - MIN_WITHDRAW            : (اختياري) حد أدنى السحب، افتراضي 0.2
+ * - MIN_WITHDRAW            : (اختياري) حد أدنى السحب بـ GRAM، افتراضي 0.2
  * - WEBAPP_URL              : رابط GitHub Pages (مثلاً https://samsamytff33.github.io/WEB/)
  * - BOT_USERNAME            : يوزر البوت بدون @ (لبناء روابط الإحالة) — الآن CrypStorebot
- * - REFERRAL_REWARD         : (اختياري) مكافأة كل إحالة نشطة، افتراضي 0.01
  * - TELEGRAM_WEBHOOK_SECRET : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
  *                               الطلبات الواردة على /api/telegram/webhook
  *                               فعليًا من تيليجرام وليس من أي جهة أخرى
@@ -43,13 +44,18 @@ if (!BOT_TOKEN) {
   process.exit(1);
 }
 
-const REWARD_PER_AD = parseFloat(process.env.REWARD_PER_AD || "0.002");
 const DAILY_AD_LIMIT = parseInt(process.env.DAILY_AD_LIMIT || "20", 10);
 const MIN_WITHDRAW = parseFloat(process.env.MIN_WITHDRAW || "0.2");
 const WEBAPP_URL = process.env.WEBAPP_URL || "https://samsamytff33.github.io/WEB/";
 const BOT_USERNAME = process.env.BOT_USERNAME || "CrypStorebot";
-const REFERRAL_REWARD = parseFloat(process.env.REFERRAL_REWARD || "0.01");
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+
+// ---------- عملة $_$ (العملة الافتراضية داخل التطبيق) ----------
+// كل الأرصدة اليومية (إعلانات، إحالات، مهام) تُمنح بعملة $_$.
+// GRAM لا يظهر إلا في صفحة السحب، بعد تحويل $_$ إليه.
+const COIN_PER_AD = parseFloat(process.env.COIN_PER_AD || "10");
+const COIN_PER_REFERRAL = parseFloat(process.env.COIN_PER_REFERRAL || "15");
+const COINS_PER_GRAM = parseFloat(process.env.COINS_PER_GRAM || "10000"); // 10,000 $_$ = 1 GRAM
 
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -68,7 +74,7 @@ const TASKS = [
     icon: "🪶",
     actionUrl: "https://t.me/CrypStore1",
     channelUsername: "CrypStore1", // without @ — bot must be a member/admin of this channel
-    reward: parseFloat(process.env.TASK_JOIN_CHANNEL_REWARD || "0.01"),
+    reward: parseFloat(process.env.TASK_JOIN_CHANNEL_REWARD || "15"), // بعملة $_$
   },
 ];
 
@@ -172,6 +178,7 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
         tx.set(ref, {
           firstName: req.tgUser.first_name || "",
           username: req.tgUser.username || "",
+          coins: 0,
           balance: 0,
           viewsToday: 0,
           totalViews: 0,
@@ -256,14 +263,14 @@ app.post("/api/ads/confirm", requireTelegramAuth, async (req, res) => {
       }
 
       tx.update(ref, {
-        balance: admin.firestore.FieldValue.increment(REWARD_PER_AD),
+        coins: admin.firestore.FieldValue.increment(COIN_PER_AD),
         viewsToday: viewsToday + 1,
         totalViews: admin.firestore.FieldValue.increment(1),
         lastViewDate: today,
       });
     });
 
-    res.json({ ok: true });
+    res.json({ ok: true, reward: COIN_PER_AD });
   } catch (e) {
     console.error(e);
     res.status(400).json({ error: e.message || "could not confirm ad view" });
@@ -314,6 +321,42 @@ app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(400).json({ error: e.message || "could not submit withdraw request" });
+  }
+});
+
+// =========================================================
+// POST /api/convert
+// يحوّل رصيد $_$ إلى GRAM بمعدل ثابت (COINS_PER_GRAM). فقط هنا
+// يظهر GRAM؛ باقي التطبيق يتعامل بعملة $_$ حصرًا.
+// body: { amount } — بعملة $_$
+// =========================================================
+app.post("/api/convert", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const coinsAmount = parseFloat(req.body.amount);
+    if (!coinsAmount || coinsAmount <= 0) {
+      return res.status(400).json({ error: "invalid amount" });
+    }
+
+    const userRef = db.collection("users").doc(userId);
+    const gramAmount = +(coinsAmount / COINS_PER_GRAM).toFixed(6);
+
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(userRef);
+      if (!doc.exists) throw new Error("user not found");
+      const coins = doc.data().coins || 0;
+      if (coinsAmount > coins) throw new Error("insufficient $_$ balance");
+
+      tx.update(userRef, {
+        coins: admin.firestore.FieldValue.increment(-coinsAmount),
+        balance: admin.firestore.FieldValue.increment(gramAmount),
+      });
+    });
+
+    res.json({ ok: true, converted: coinsAmount, gram: gramAmount });
+  } catch (e) {
+    console.error(e);
+    res.status(400).json({ error: e.message || "could not convert" });
   }
 });
 
@@ -435,9 +478,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
         // رسالة ترحيب مختصرة واحترافية عند /start — تحمل اسم وهوية CrypStore 🏹
         const welcomeCaption =
           `🏹 <b>Welcome to CrypStore, ${firstName}!</b>\n\n` +
-          `⛏ Earn ${REWARD_PER_AD} GRAM per ad\n` +
-          `🤝 ${REFERRAL_REWARD} GRAM per invite\n` +
-          `💸 Fast payouts & full control over your wallet`;
+          `⛏ Earn ${COIN_PER_AD} $_$ per ad\n` +
+          `🤝 ${COIN_PER_REFERRAL} $_$ per invite\n` +
+          `💸 Convert $_$ to GRAM and withdraw anytime`;
 
         const replyMarkup = {
           inline_keyboard: [
@@ -501,8 +544,8 @@ app.post("/api/referrals/list", requireTelegramAuth, async (req, res) => {
       referralLink: userData.referralCode ? `https://t.me/${BOT_USERNAME}?start=${userData.referralCode}` : null,
       referralCount: userData.referralCount || 0,
       referrals,
-      unclaimedReward: +(unclaimedCount * REFERRAL_REWARD).toFixed(6),
-      rewardPerReferral: REFERRAL_REWARD,
+      unclaimedReward: +(unclaimedCount * COIN_PER_REFERRAL).toFixed(6),
+      rewardPerReferral: COIN_PER_REFERRAL,
     });
   } catch (e) {
     console.error(e);
@@ -528,13 +571,13 @@ app.post("/api/referrals/claim", requireTelegramAuth, async (req, res) => {
       return res.json({ ok: true, claimed: 0, amount: 0 });
     }
 
-    const amount = +(snap.size * REFERRAL_REWARD).toFixed(6);
+    const amount = +(snap.size * COIN_PER_REFERRAL).toFixed(6);
     const userRef = db.collection("users").doc(userId);
 
     await db.runTransaction(async (tx) => {
       const docs = await Promise.all(snap.docs.map((d) => tx.get(d.ref)));
       docs.forEach((d) => tx.update(d.ref, { rewardClaimed: true }));
-      tx.update(userRef, { balance: admin.firestore.FieldValue.increment(amount) });
+      tx.update(userRef, { coins: admin.firestore.FieldValue.increment(amount) });
     });
 
     res.json({ ok: true, claimed: snap.size, amount });
@@ -624,7 +667,7 @@ app.post("/api/tasks/verify", requireTelegramAuth, async (req, res) => {
       const freshClaimed = fresh.data().tasksClaimed || {};
       if (freshClaimed[task.id]) return; // already claimed by a concurrent request
       tx.update(userRef, {
-        balance: admin.firestore.FieldValue.increment(task.reward),
+        coins: admin.firestore.FieldValue.increment(task.reward),
         [`tasksClaimed.${task.id}`]: true,
       });
     });

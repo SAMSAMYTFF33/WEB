@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>CrypStore 🏹 — Earn TON by Watching Ads</title>
+<title>CrypStore 🏹 — Earn GRAM by Watching Ads</title>
 <link rel="icon" type="image/png" href="assets/favicon_128.png">
 <link rel="apple-touch-icon" href="assets/logo_512.png">
 <meta property="og:title" content="CrypStore 🏹">
-<meta property="og:description" content="Earn TON by watching ads">
+<meta property="og:description" content="Earn GRAM by watching ads">
 <meta property="og:image" content="assets/logo_512.png">
 <!-- Telegram WebApp SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -229,11 +229,31 @@ main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .empty{ text-align:center; padding:28px 10px; color:var(--text-muted); font-size:12.5px; line-height:1.7; }
-.rate-pill{
-  display:inline-flex; align-items:center; gap:6px; background: var(--success-bg); color:#8fd0ac;
-  padding:5px 11px; border-radius:8px; font-size:11px; font-weight:700; letter-spacing:.2px;
+
+/* ===== Tasks ===== */
+.task-card{ background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:11px; }
+.task-card.completed{ border-color: rgba(78,157,120,.25); background: linear-gradient(160deg, #131b17, var(--surface)); }
+.task-row{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.task-icon{
+  width:42px; height:42px; border-radius:12px; flex-shrink:0;
+  background: var(--surface-2); border:1px solid var(--border-strong);
+  display:flex; align-items:center; justify-content:center; font-size:19px;
 }
-.rate-pill svg{ width:12px; height:12px; }
+.task-copy{ flex:1; min-width:0; }
+.task-title{ font-size:13.5px; font-weight:700; color:var(--text); }
+.task-sub{ font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5; }
+.task-reward{
+  flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:1px;
+  font-family:'IBM Plex Mono', monospace; font-weight:700; font-size:13px; color:var(--brass-2);
+}
+.task-reward span{ font-size:9.5px; font-weight:700; letter-spacing:.3px; color:var(--text-muted); font-family:'Tajawal', sans-serif; text-transform:uppercase; }
+.task-actions{ display:flex; gap:8px; }
+.task-actions .btn{ flex:1; }
+.task-done{
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  color:#8fd0ac; font-size:12.5px; font-weight:700; padding:12px; background: var(--success-bg); border-radius:10px;
+}
+.task-done svg{ width:15px; height:15px; }
 .friend-row{
   display:flex; align-items:center; justify-content:space-between; padding:11px 0;
 }
@@ -243,21 +263,6 @@ main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
 .friend-status.active{ background: var(--success-bg); color:#8fd0ac; }
 .friend-status.claimed{ background: var(--surface-2); color:var(--text-muted); }
 .friend-status.pending{ background: rgba(198,162,92,.12); color:var(--brass-2); }
-
-/* ===== Tasks ===== */
-.task-item{ display:flex; align-items:center; gap:12px; }
-.task-icon{
-  width:40px; height:40px; border-radius:12px; flex-shrink:0;
-  background:var(--surface-2); border:1px solid var(--border-strong);
-  display:flex; align-items:center; justify-content:center; color:var(--brass-2);
-}
-.task-icon svg{ width:19px; height:19px; }
-.task-main{ flex:1; min-width:0; }
-.task-title{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.task-reward{ font-size:11.5px; color:var(--brass-2); font-family:'IBM Plex Mono', monospace; margin-top:3px; }
-.task-actions{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; width:104px; }
-.task-actions .btn{ padding:9px; font-size:11.5px; width:100%; }
-
 nav{
   position:fixed; bottom:0; left:0; right:0; background: rgba(10,13,18,.94); backdrop-filter: blur(16px);
   border-top:1px solid var(--border); padding: 9px 12px calc(9px + var(--safe-bottom)); display:flex; gap:2px; z-index:20;
@@ -308,7 +313,7 @@ nav{
   <div class="balance-card">
     <div>
       <div class="balance-label">Current Balance</div>
-      <div class="balance-value mono"><span id="balanceValue">0.000</span><span class="unit">TON</span></div>
+      <div class="balance-value mono"><span id="balanceValue">0.000</span><span class="unit">GRAM</span></div>
       <div class="balance-usd" id="balanceUsd">≈ $0.00</div>
     </div>
     <div class="coin-icon">
@@ -326,7 +331,7 @@ nav{
         <div class="dial-core">
           <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15l13-7.5Z"/></svg>
           <div class="cta">Watch Ad</div>
-          <div class="sub">+<b>0.002</b> TON</div>
+          <div class="sub">+<b>0.002</b> GRAM</div>
         </div>
         <div class="burst" id="burst"></div>
       </button>
@@ -335,7 +340,7 @@ nav{
 
     <div class="section-title">Your Stats</div>
     <div class="card">
-      <div class="row"><span class="k">Today's Earnings</span><span class="v mono" id="statToday">0.000 TON</span></div>
+      <div class="row"><span class="k">Today's Earnings</span><span class="v mono" id="statToday">0.000 GRAM</span></div>
       <div class="row"><span class="k">Total Views</span><span class="v mono" id="statViews">0</span></div>
       <div class="row"><span class="k">Views Left Today</span><span class="v mono" id="statLeft">20</span></div>
     </div>
@@ -344,19 +349,19 @@ nav{
 
   <!-- ===== Tasks ===== -->
   <section class="view" id="view-tasks">
-    <div class="section-title">Available Tasks</div>
-    <div class="card" id="tasksListCard">
-      <div class="empty">Loading tasks…</div>
+    <div class="section-title">Tasks</div>
+    <div id="tasksList">
+      <div class="empty" id="tasksLoading">Loading tasks…</div>
     </div>
-    <div class="hint">Task rewards are only credited once the server verifies you've actually joined — tapping Verify alone isn't enough.</div>
+    <div class="hint">Complete tasks to earn extra GRAM. New tasks are added regularly — check back often.</div>
   </section>
 
   <!-- ===== Referrals ===== -->
   <section class="view" id="view-ref">
     <div class="section-title">Invite Friends</div>
     <div class="card">
-      <div class="row"><span class="k">Your reward per active referral</span><span class="v mono" id="refRewardRate">0.010 TON</span></div>
-      <div class="row"><span class="k">Unclaimed rewards</span><span class="v mono" id="refUnclaimed">0.000 TON</span></div>
+      <div class="row"><span class="k">Your reward per active referral</span><span class="v mono" id="refRewardRate">0.010 GRAM</span></div>
+      <div class="row"><span class="k">Unclaimed rewards</span><span class="v mono" id="refUnclaimed">0.000 GRAM</span></div>
     </div>
     <button class="btn btn-primary" id="claimRefBtn" disabled>Claim Reward</button>
 
@@ -373,8 +378,8 @@ nav{
   <section class="view" id="view-withdraw">
     <div class="section-title">Withdraw Earnings</div>
     <div class="card">
-      <div class="row"><span class="k">Withdrawable Balance</span><span class="v mono" id="withdrawableBalance">0.000 TON</span></div>
-      <div class="row"><span class="k">Minimum Withdrawal</span><span class="v mono">0.200 TON</span></div>
+      <div class="row"><span class="k">Withdrawable Balance</span><span class="v mono" id="withdrawableBalance">0.000 GRAM</span></div>
+      <div class="row"><span class="k">Minimum Withdrawal</span><span class="v mono">0.200 GRAM</span></div>
     </div>
 
     <div class="section-title">Destination Wallet</div>
@@ -385,7 +390,7 @@ nav{
         </div>
         <div class="wallet-copy">
           <div class="wallet-title">No wallet connected</div>
-          <div class="wallet-sub">Connect your TON wallet to withdraw — no address to copy or paste.</div>
+          <div class="wallet-sub">Connect your wallet to withdraw — no address to copy or paste.</div>
         </div>
       </div>
       <div class="wallet-row" id="walletConnected" style="display:none;">
@@ -401,7 +406,7 @@ nav{
       <button class="btn btn-ghost" id="disconnectWalletBtn" style="display:none;">Disconnect Wallet</button>
     </div>
 
-    <input class="input" id="withdrawAmount" placeholder="Amount (TON)" dir="ltr" inputmode="decimal">
+    <input class="input" id="withdrawAmount" placeholder="Amount (GRAM)" dir="ltr" inputmode="decimal">
     <button class="btn btn-ton" id="withdrawBtn" disabled>Request Withdrawal</button>
     <div class="hint warn">Withdrawals are sent as a request to the server for review and processing — no transaction is signed or sent directly from this page, to protect users' keys.</div>
 
@@ -416,7 +421,7 @@ nav{
     <span>Home</span>
   </button>
   <button class="tab" data-view="view-tasks">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M8 10.5 10.5 13 16 8"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.4"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
     <span>Tasks</span>
   </button>
   <button class="tab" data-view="view-ref">
@@ -618,8 +623,8 @@ let state = { balance: 0, viewsToday: 0, totalViews: 0 };
 
 function renderBalance() {
   document.getElementById("balanceValue").textContent = state.balance.toFixed(3);
-  document.getElementById("withdrawableBalance").textContent = state.balance.toFixed(3) + " TON";
-  document.getElementById("statToday").textContent = (state.viewsToday * CONFIG.REWARD_PER_AD).toFixed(3) + " TON";
+  document.getElementById("withdrawableBalance").textContent = state.balance.toFixed(3) + " GRAM";
+  document.getElementById("statToday").textContent = (state.viewsToday * CONFIG.REWARD_PER_AD).toFixed(3) + " GRAM";
   document.getElementById("statViews").textContent = state.totalViews;
   const left = Math.max(0, CONFIG.DAILY_AD_LIMIT - state.viewsToday);
   document.getElementById("statLeft").textContent = left;
@@ -698,130 +703,7 @@ document.getElementById("orbBtn").addEventListener("click", async () => {
 });
 
 /* =========================================================
-   10) Tasks — real list from the server; a task is only credited
-   once the server verifies it server-side (e.g. actual channel
-   membership via the Bot API), not just because Verify was tapped.
-   ========================================================= */
-let tasksState = [];
-const openedTasks = new Set(); // task ids the user tapped "Open Channel" for this session
-
-async function loadTasks() {
-  const card = document.getElementById("tasksListCard");
-  try {
-    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/list`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-      body: JSON.stringify({}),
-    });
-    if (!res.ok) throw new Error("failed to load tasks");
-    const data = await res.json();
-    tasksState = data.tasks || [];
-    renderTasks();
-  } catch (e) {
-    console.warn("loadTasks error", e);
-    card.innerHTML = '<div class="empty">Couldn\u2019t load tasks right now.</div>';
-  }
-}
-
-function renderTasks() {
-  const card = document.getElementById("tasksListCard");
-  if (!tasksState.length) {
-    card.innerHTML = '<div class="empty">No tasks available right now.</div>';
-    return;
-  }
-  card.innerHTML = "";
-  tasksState.forEach((task, i) => {
-    const item = document.createElement("div");
-    item.className = "task-item";
-    if (i > 0) item.style.borderTop = "1px solid var(--border)";
-    item.style.padding = "12px 0";
-
-    const icon = document.createElement("div");
-    icon.className = "task-icon";
-    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>';
-
-    const main = document.createElement("div");
-    main.className = "task-main";
-    const title = document.createElement("div");
-    title.className = "task-title";
-    title.textContent = task.title;
-    const reward = document.createElement("div");
-    reward.className = "task-reward";
-    reward.textContent = `+${Number(task.reward).toFixed(3)} TON`;
-    main.appendChild(title);
-    main.appendChild(reward);
-
-    item.appendChild(icon);
-    item.appendChild(main);
-
-    if (task.completed) {
-      const badge = document.createElement("span");
-      badge.className = "friend-status claimed";
-      badge.textContent = "Completed";
-      item.appendChild(badge);
-    } else {
-      const actions = document.createElement("div");
-      actions.className = "task-actions";
-
-      const openBtn = document.createElement("button");
-      openBtn.className = "btn btn-ghost";
-      openBtn.textContent = "Open Channel";
-      openBtn.addEventListener("click", () => {
-        if (tg?.openTelegramLink) tg.openTelegramLink(task.channelLink);
-        else window.open(task.channelLink, "_blank");
-        openedTasks.add(task.id);
-        verifyBtn.disabled = false;
-      });
-
-      const verifyBtn = document.createElement("button");
-      verifyBtn.className = "btn btn-primary";
-      verifyBtn.textContent = "Verify";
-      verifyBtn.disabled = !openedTasks.has(task.id);
-      verifyBtn.addEventListener("click", () => verifyTask(task.id, verifyBtn));
-
-      actions.appendChild(openBtn);
-      actions.appendChild(verifyBtn);
-      item.appendChild(actions);
-    }
-
-    card.appendChild(item);
-  });
-}
-
-async function verifyTask(taskId, btnEl) {
-  btnEl.disabled = true;
-  const originalLabel = btnEl.textContent;
-  btnEl.textContent = "Checking…";
-  try {
-    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-      body: JSON.stringify({ taskId }),
-    });
-    if (!res.ok) throw new Error("verify failed");
-    const data = await res.json();
-    if (data.verified || data.alreadyCompleted) {
-      const amount = Number(data.reward || 0).toFixed(3);
-      showToast(data.alreadyCompleted ? "Task already completed" : `Task verified (+${amount} TON)`);
-      if (!data.alreadyCompleted) playClaimSound();
-      await loadTasks();
-    } else {
-      showToast("We couldn't find your subscription yet — join the channel, then try again");
-      btnEl.disabled = false;
-      btnEl.textContent = originalLabel;
-    }
-  } catch (e) {
-    console.warn(e);
-    showToast("Couldn't verify right now, try again later");
-    btnEl.disabled = false;
-    btnEl.textContent = originalLabel;
-  }
-}
-
-document.querySelector('.tab[data-view="view-tasks"]').addEventListener("click", loadTasks);
-
-/* =========================================================
-   11) Referrals — connected to the server/Firestore
+   10) Referrals — connected to the server/Firestore
    ========================================================= */
 let currentReferralLink = "";
 async function loadReferrals() {
@@ -838,8 +720,8 @@ async function loadReferrals() {
       ? currentReferralLink.replace("https://", "")
       : "Not available yet";
     document.getElementById("refCount").textContent = data.referralCount || 0;
-    document.getElementById("refRewardRate").textContent = data.rewardPerReferral.toFixed(3) + " TON";
-    document.getElementById("refUnclaimed").textContent = data.unclaimedReward.toFixed(3) + " TON";
+    document.getElementById("refRewardRate").textContent = data.rewardPerReferral.toFixed(3) + " GRAM";
+    document.getElementById("refUnclaimed").textContent = data.unclaimedReward.toFixed(3) + " GRAM";
     document.getElementById("claimRefBtn").disabled = !(data.unclaimedReward > 0);
 
     const listCard = document.getElementById("refListCard");
@@ -882,7 +764,7 @@ document.getElementById("claimRefBtn").addEventListener("click", async () => {
     if (!res.ok) throw new Error("claim failed");
     const data = await res.json();
     if (data.claimed > 0) {
-      showToast(`Claimed ${data.amount.toFixed(3)} TON from ${data.claimed} referrals`);
+      showToast(`Claimed ${data.amount.toFixed(3)} GRAM from ${data.claimed} referrals`);
       playClaimSound();
       loadReferrals();
     } else {
@@ -895,6 +777,132 @@ document.getElementById("claimRefBtn").addEventListener("click", async () => {
 });
 
 document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", loadReferrals);
+
+/* =========================================================
+   11) Tasks — data-driven list fetched from the server, so new
+   tasks can be added later purely on the backend with no
+   front-end changes needed. Each task has a type that decides
+   how it's verified (currently: "telegram_channel").
+   ========================================================= */
+let tasksCache = [];
+
+function taskIconMarkup(task) {
+  if (task.icon) return task.icon; // e.g. an emoji provided by the server
+  return "🎯";
+}
+
+function renderTasks() {
+  const list = document.getElementById("tasksList");
+  if (!tasksCache.length) {
+    list.innerHTML = '<div class="empty">No tasks available right now — check back soon.</div>';
+    return;
+  }
+
+  list.innerHTML = tasksCache.map((task) => {
+    const rewardStr = task.reward.toFixed(3).replace(/0+$/, "").replace(/\.$/, "") || task.reward.toString();
+    if (task.completed) {
+      return `
+        <div class="task-card completed" data-task-id="${task.id}">
+          <div class="task-row">
+            <div class="task-icon">${taskIconMarkup(task)}</div>
+            <div class="task-copy">
+              <div class="task-title">${task.title}</div>
+              <div class="task-sub">${task.description}</div>
+            </div>
+            <div class="task-reward">+${rewardStr}<span>GRAM</span></div>
+          </div>
+          <div class="task-done">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            Completed
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="task-card" data-task-id="${task.id}">
+        <div class="task-row">
+          <div class="task-icon">${taskIconMarkup(task)}</div>
+          <div class="task-copy">
+            <div class="task-title">${task.title}</div>
+            <div class="task-sub">${task.description}</div>
+          </div>
+          <div class="task-reward">+${rewardStr}<span>GRAM</span></div>
+        </div>
+        <div class="task-actions">
+          <button class="btn btn-primary task-open-btn" data-url="${task.actionUrl}">Join Channel</button>
+          <button class="btn btn-ghost task-verify-btn" style="display:none;">Verify</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function loadTasks() {
+  try {
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error("failed to load tasks");
+    const data = await res.json();
+    tasksCache = data.tasks || [];
+    renderTasks();
+  } catch (e) {
+    console.warn("loadTasks error", e);
+    document.getElementById("tasksList").innerHTML = '<div class="empty">Could not load tasks. Pull to refresh and try again.</div>';
+  }
+}
+
+// Event delegation: works for every task card, including ones added later
+document.getElementById("tasksList").addEventListener("click", async (e) => {
+  const openBtn = e.target.closest(".task-open-btn");
+  const verifyBtn = e.target.closest(".task-verify-btn");
+
+  if (openBtn) {
+    const url = openBtn.dataset.url;
+    if (url) {
+      if (url.startsWith("https://t.me/")) tg?.openTelegramLink?.(url);
+      else tg?.openLink?.(url) ?? window.open(url, "_blank");
+    }
+    openBtn.style.display = "none";
+    const verifyEl = openBtn.parentElement.querySelector(".task-verify-btn");
+    if (verifyEl) verifyEl.style.display = "flex";
+    return;
+  }
+
+  if (verifyBtn) {
+    const card = verifyBtn.closest(".task-card");
+    const taskId = card?.dataset.taskId;
+    if (!taskId) return;
+    verifyBtn.disabled = true;
+    verifyBtn.textContent = "Verifying…";
+    try {
+      const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+        body: JSON.stringify({ taskId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "verification failed");
+
+      if (data.verified) {
+        showToast(data.alreadyClaimed ? "Task already completed" : `Task complete! +${data.reward ?? ""} GRAM`.trim());
+        if (!data.alreadyClaimed) { playClaimSound(); tg?.HapticFeedback?.notificationOccurred("success"); }
+        await loadTasks();
+      } else {
+        showToast("You haven't joined the channel yet");
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "Verify";
+      }
+    } catch (e) {
+      console.warn(e);
+      showToast("Could not verify right now, try again");
+      verifyBtn.disabled = false;
+      verifyBtn.textContent = "Verify";
+    }
+  }
+});
+
+document.querySelector('.tab[data-view="view-tasks"]').addEventListener("click", loadTasks);
 
 /* =========================================================
    12) TON Connect — wallet connection for withdrawals
@@ -914,7 +922,7 @@ function renderWalletConnected(wallet) {
   document.getElementById("walletDisconnected").style.display = "none";
   document.getElementById("walletConnected").style.display = "flex";
   document.getElementById("walletAddressShort").textContent = shortenAddress(connectedWalletAddress);
-  document.getElementById("walletAppName").textContent = `Connected via ${wallet?.device?.appName || "TON wallet"}`;
+  document.getElementById("walletAppName").textContent = `Connected via ${wallet?.device?.appName || "your wallet"}`;
   document.getElementById("connectWalletBtn").style.display = "none";
   document.getElementById("disconnectWalletBtn").style.display = "flex";
   document.getElementById("withdrawBtn").disabled = false;
@@ -965,7 +973,7 @@ document.getElementById("withdrawBtn").addEventListener("click", async () => {
   const wallet = connectedWalletAddress;
   const amount = parseFloat(document.getElementById("withdrawAmount").value);
   if (!wallet) { showToast("Connect your wallet first"); return; }
-  if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`Minimum withdrawal is ${CONFIG.MIN_WITHDRAW} TON`); return; }
+  if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`Minimum withdrawal is ${CONFIG.MIN_WITHDRAW} GRAM`); return; }
   if (amount > state.balance) { showToast("Insufficient balance"); return; }
 
   try {

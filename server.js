@@ -1,28 +1,22 @@
 /**
- * TapEarn Backend — Express + Firebase Admin SDK
+ * CrypStore 🏹 Backend — Express + Firebase Admin SDK
  * ------------------------------------------------
  * هذا السيرفر هو المكان الوحيد المسموح له بالكتابة على Firestore.
  * الواجهة الأمامية (index.html) لا تكتب على قاعدة البيانات مباشرة أبدًا.
  *
  * متغيرات البيئة المطلوبة (Render → Environment، أو Railway → Variables):
- *  - BOT_TOKEN                : توكن بوت تيليجرام من BotFather
- *  - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
- *                                Firebase Console > Project settings > Service accounts
- *  - REWARD_PER_AD            : (اختياري) قيمة المكافأة لكل إعلان، افتراضي 0.002
- *  - DAILY_AD_LIMIT           : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
- *  - MIN_WITHDRAW             : (اختياري) حد أدنى السحب، افتراضي 0.2
- *  - WEBAPP_URL               : رابط GitHub Pages (متلا https://samsamytff33.github.io/WEB/)
- *  - BOT_USERNAME             : يوزر البوت بدون @ (لبناء روابط الإحالة)
- *  - REFERRAL_REWARD          : (اختياري) مكافأة كل إحالة نشطة، افتراضي 0.01
- *  - TASK_REWARD              : (اختياري) مكافأة مهمة الاشتراك بالقناة، افتراضي 0.01
- *  - TASK_CHANNEL_USERNAME    : (اختياري) يوزر قناة المهمة بدون @، افتراضي CrypStore1
- *  - TELEGRAM_WEBHOOK_SECRET  : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
- *                                الطلبات الواردة على /api/telegram/webhook
- *                                فعليًا من تيليجرام وليس من أي جهة أخرى
- *
- * ⚠️ مهم لعمل مهمة "الاشتراك بالقناة": يجب إضافة البوت كمشرف (admin) في
- * قناة @CrypStore1 (أو أي قناة تحددها عبر TASK_CHANNEL_USERNAME)، وإلا
- * فستفشل getChatMember ولن يقدر الخادم يتحقق من اشتراك المستخدمين.
+ * - BOT_TOKEN               : توكن بوت تيليجرام من BotFather
+ * - FIREBASE_SERVICE_ACCOUNT : محتوى ملف JSON الكامل (كنص) من
+ *                               Firebase Console > Project settings > Service accounts
+ * - REWARD_PER_AD           : (اختياري) قيمة المكافأة لكل إعلان، افتراضي 0.002
+ * - DAILY_AD_LIMIT          : (اختياري) الحد اليومي للمشاهدات، افتراضي 20
+ * - MIN_WITHDRAW            : (اختياري) حد أدنى السحب، افتراضي 0.2
+ * - WEBAPP_URL              : رابط GitHub Pages (مثلاً https://samsamytff33.github.io/WEB/)
+ * - BOT_USERNAME            : يوزر البوت بدون @ (لبناء روابط الإحالة) — الآن CrypStorebot
+ * - REFERRAL_REWARD         : (اختياري) مكافأة كل إحالة نشطة، افتراضي 0.01
+ * - TELEGRAM_WEBHOOK_SECRET : نص عشوائي من اختيارك، يُستخدم للتحقق من أن
+ *                               الطلبات الواردة على /api/telegram/webhook
+ *                               فعليًا من تيليجرام وليس من أي جهة أخرى
  */
 
 const express = require("express");
@@ -48,28 +42,33 @@ if (!BOT_TOKEN) {
   console.error("BOT_TOKEN env var is missing.");
   process.exit(1);
 }
+
 const REWARD_PER_AD = parseFloat(process.env.REWARD_PER_AD || "0.002");
 const DAILY_AD_LIMIT = parseInt(process.env.DAILY_AD_LIMIT || "20", 10);
 const MIN_WITHDRAW = parseFloat(process.env.MIN_WITHDRAW || "0.2");
 const WEBAPP_URL = process.env.WEBAPP_URL || "https://samsamytff33.github.io/WEB/";
-const BOT_USERNAME = process.env.BOT_USERNAME || "Bbotfrubot";
+const BOT_USERNAME = process.env.BOT_USERNAME || "CrypStorebot";
 const REFERRAL_REWARD = parseFloat(process.env.REFERRAL_REWARD || "0.01");
-const TASK_REWARD = parseFloat(process.env.TASK_REWARD || "0.01");
-const TASK_CHANNEL_USERNAME = process.env.TASK_CHANNEL_USERNAME || "CrypStore1";
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 // =========================================================
-// تعريف المهام — أضف عناصر جديدة هنا مستقبلًا لإضافة مهام أخرى
+// Tasks — defined here so new tasks can be added later by
+// editing only this array (no frontend changes needed).
+// Each task's `type` decides how /api/tasks/verify checks it.
+// Currently supported type: "telegram_channel".
 // =========================================================
 const TASKS = [
   {
-    id: "join_crypstore",
+    id: "join_crypstore_channel",
     type: "telegram_channel",
-    channelUsername: TASK_CHANNEL_USERNAME,
-    channelLink: `https://t.me/${TASK_CHANNEL_USERNAME}`,
-    reward: TASK_REWARD,
-    title: "اشتراك بقناة CrypStore 🪶",
+    title: "Subscribe to CrypStore 🪶",
+    description: "Join our official channel and stay updated.",
+    icon: "🪶",
+    actionUrl: "https://t.me/CrypStore1",
+    channelUsername: "CrypStore1", // without @ — bot must be a member/admin of this channel
+    reward: parseFloat(process.env.TASK_JOIN_CHANNEL_REWARD || "0.01"),
   },
 ];
 
@@ -83,7 +82,6 @@ app.use(express.json());
 // =========================================================
 function verifyInitData(initData) {
   if (!initData) return null;
-
   const urlParams = new URLSearchParams(initData);
   const hash = urlParams.get("hash");
   if (!hash) return null;
@@ -107,6 +105,7 @@ function verifyInitData(initData) {
 
   const userJson = urlParams.get("user");
   if (!userJson) return null;
+
   return JSON.parse(userJson); // { id, first_name, username, ... }
 }
 
@@ -136,6 +135,7 @@ function generateReferralCode(length = 6) {
   }
   return code;
 }
+
 async function createUniqueReferralCode() {
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = generateReferralCode();
@@ -179,7 +179,6 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
           referredBy: referrerId,
           referralCode: myCode,
           referralCount: 0,
-          completedTasks: [],
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         tx.set(db.collection("referralCodes").doc(myCode), { userId });
@@ -214,21 +213,13 @@ app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
           `Go to the Friends section and claim your reward.`;
         await sendTelegramMessage(referrerId, notif);
       }
-    } else {
-      const patch = {};
-      if (!doc.data().referralCode) {
-        // مستخدم قديم أُنشئ قبل إضافة نظام الإحالة — نولّد له كود الآن
-        const myCode = await createUniqueReferralCode();
-        patch.referralCode = myCode;
-        await db.collection("referralCodes").doc(myCode).set({ userId });
-      }
-      if (!Array.isArray(doc.data().completedTasks)) {
-        // مستخدم قديم أُنشئ قبل إضافة نظام المهام
-        patch.completedTasks = [];
-      }
-      if (Object.keys(patch).length > 0) {
-        await ref.update(patch);
-      }
+    } else if (!doc.data().referralCode) {
+      // مستخدم قديم أُنشئ قبل إضافة نظام الإحالة — نولّد له كود الآن
+      const myCode = await createUniqueReferralCode();
+      await db.runTransaction(async (tx) => {
+        tx.update(ref, { referralCode: myCode, referralCount: doc.data().referralCount || 0 });
+        tx.set(db.collection("referralCodes").doc(myCode), { userId });
+      });
     }
 
     const fresh = await ref.get();
@@ -276,90 +267,6 @@ app.post("/api/ads/confirm", requireTelegramAuth, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(400).json({ error: e.message || "could not confirm ad view" });
-  }
-});
-
-// =========================================================
-// POST /api/tasks/list
-// يرجّع قائمة المهام مع حالة إكمال كل واحدة لهذا المستخدم تحديدًا
-// =========================================================
-app.post("/api/tasks/list", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const userDoc = await db.collection("users").doc(userId).get();
-    const completed = (userDoc.exists && userDoc.data().completedTasks) || [];
-
-    const tasks = TASKS.map((t) => ({
-      id: t.id,
-      title: t.title,
-      reward: t.reward,
-      channelLink: t.channelLink,
-      completed: completed.includes(t.id),
-    }));
-
-    res.json({ ok: true, tasks });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
-});
-
-// =========================================================
-// POST /api/tasks/verify
-// يتحقق فعليًا (عبر Bot API) من انضمام المستخدم لقناة المهمة قبل منح
-// المكافأة — لا يمنح شيء لمجرد الضغط على "تأكيد" من الواجهة.
-// body: { taskId }
-// =========================================================
-app.post("/api/tasks/verify", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const { taskId } = req.body;
-    const task = TASKS.find((t) => t.id === taskId);
-    if (!task) return res.status(404).json({ error: "task not found" });
-
-    const userRef = db.collection("users").doc(userId);
-    const userDoc = await userRef.get();
-    if (!userDoc.exists) return res.status(404).json({ error: "user not found" });
-
-    const completed = userDoc.data().completedTasks || [];
-    if (completed.includes(taskId)) {
-      return res.json({ ok: true, alreadyCompleted: true, reward: 0 });
-    }
-
-    let isMember = false;
-    if (task.type === "telegram_channel") {
-      try {
-        const chatId = "@" + task.channelUsername;
-        const apiRes = await fetch(
-          `${TELEGRAM_API}/getChatMember?chat_id=${encodeURIComponent(chatId)}&user_id=${userId}`
-        );
-        const data = await apiRes.json();
-        if (data.ok && ["member", "administrator", "creator"].includes(data.result.status)) {
-          isMember = true;
-        }
-      } catch (e) {
-        console.error("getChatMember failed", e);
-      }
-    }
-
-    if (!isMember) {
-      return res.json({ ok: true, verified: false, reward: 0 });
-    }
-
-    await db.runTransaction(async (tx) => {
-      const freshDoc = await tx.get(userRef);
-      const freshCompleted = freshDoc.data().completedTasks || [];
-      if (freshCompleted.includes(taskId)) return; // تجنّب منح مضاعف عند نقرات متزامنة
-      tx.update(userRef, {
-        balance: admin.firestore.FieldValue.increment(task.reward),
-        completedTasks: admin.firestore.FieldValue.arrayUnion(taskId),
-      });
-    });
-
-    res.json({ ok: true, verified: true, reward: task.reward });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
   }
 });
 
@@ -413,7 +320,7 @@ app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
 // =========================================================
 // POST /api/telegram/webhook
 // يستقبل تحديثات البوت من تيليجرام (رسائل، أوامر). عند /start
-// يرد بزر يفتح الـ Web App.
+// يرد برسالة ترحيب احترافية وزر يفتح الـ Web App.
 // =========================================================
 async function sendTelegramMessage(chatId, text, replyMarkup) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -422,6 +329,7 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
     body: JSON.stringify({
       chat_id: chatId,
       text,
+      parse_mode: "HTML",
       reply_markup: replyMarkup,
     }),
   });
@@ -435,6 +343,7 @@ async function sendTelegramPhoto(chatId, photoUrl, caption, replyMarkup) {
       chat_id: chatId,
       photo: photoUrl,
       caption,
+      parse_mode: "HTML",
       reply_markup: replyMarkup,
     }),
   });
@@ -457,6 +366,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
   try {
     const update = req.body;
     const message = update.message;
+
     if (message && message.text) {
       const chatId = message.chat.id;
       const text = message.text.trim();
@@ -484,16 +394,29 @@ app.post("/api/telegram/webhook", async (req, res) => {
           }
         }
 
+        const firstName = message.from?.first_name || "there";
+
+        // رسالة ترحيب مختصرة واحترافية عند /start — تحمل اسم وهوية CrypStore 🏹
+        const welcomeCaption =
+          `🏹 <b>Welcome to CrypStore, ${firstName}!</b>\n\n` +
+          `⛏ Earn ${REWARD_PER_AD} GRAM per ad\n` +
+          `🤝 ${REFERRAL_REWARD} GRAM per invite\n` +
+          `💸 Fast payouts & full control over your wallet`;
+
         await sendTelegramPhoto(
           chatId,
           `${WEBAPP_URL}assets/logo_1.png`,
-          "Welcome to TapEarn.\nWatch ads, earn TON, and withdraw straight to your wallet. Tap below to get started.",
+          welcomeCaption,
           {
-            inline_keyboard: [[{ text: "Open App", web_app: { url: WEBAPP_URL } }]],
+            inline_keyboard: [
+              [{ text: "🚀 Start CrypStore", web_app: { url: WEBAPP_URL } }],
+              [{ text: "🌐 Community", url: "https://t.me/CrypStore1" }],
+            ],
           }
         );
       }
     }
+
     res.sendStatus(200); // لازم ترد 200 دائمًا، وإلا تيليجرام بيعيد المحاولة بشكل متكرر
   } catch (e) {
     console.error("webhook error", e);
@@ -576,8 +499,100 @@ app.post("/api/referrals/claim", requireTelegramAuth, async (req, res) => {
   }
 });
 
+// =========================================================
+// Tasks — helper: checks Telegram channel membership via getChatMember.
+// ⚠️ The bot must be a member (ideally admin) of the channel, or this
+// call fails with "chat not found" / "member list is inaccessible".
+// =========================================================
+async function isSubscribedToChannel(channelUsername, userId) {
+  const url = `${TELEGRAM_API}/getChatMember?chat_id=@${encodeURIComponent(channelUsername)}&user_id=${userId}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.ok) {
+    console.warn("getChatMember failed:", data.description);
+    return false;
+  }
+  const status = data.result?.status;
+  return ["member", "administrator", "creator"].includes(status);
+}
+
+// =========================================================
+// POST /api/tasks/list
+// يرجّع كل المهام المتاحة مع حالة كل واحدة بالنسبة لهذا المستخدم
+// (مكتملة أم لا) — إضافة مهمة جديدة تتم فقط بتعديل مصفوفة TASKS بالأعلى
+// =========================================================
+app.post("/api/tasks/list", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const userDoc = await db.collection("users").doc(userId).get();
+    const tasksClaimed = (userDoc.exists && userDoc.data().tasksClaimed) || {};
+
+    const tasks = TASKS.map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      icon: t.icon,
+      actionUrl: t.actionUrl,
+      reward: t.reward,
+      completed: !!tasksClaimed[t.id],
+    }));
+
+    res.json({ ok: true, tasks });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// =========================================================
+// POST /api/tasks/verify
+// يتحقق من إنجاز مهمة معيّنة، ويمنح المكافأة مرة واحدة فقط لكل مستخدم
+// body: { taskId }
+// =========================================================
+app.post("/api/tasks/verify", requireTelegramAuth, async (req, res) => {
+  try {
+    const userId = String(req.tgUser.id);
+    const { taskId } = req.body;
+    const task = TASKS.find((t) => t.id === taskId);
+    if (!task) return res.status(404).json({ error: "task not found" });
+
+    const userRef = db.collection("users").doc(userId);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return res.status(404).json({ error: "user not found" });
+
+    const tasksClaimed = userDoc.data().tasksClaimed || {};
+    if (tasksClaimed[task.id]) {
+      return res.json({ ok: true, verified: true, alreadyClaimed: true });
+    }
+
+    let verified = false;
+    if (task.type === "telegram_channel") {
+      verified = await isSubscribedToChannel(task.channelUsername, userId);
+    }
+
+    if (!verified) {
+      return res.json({ ok: true, verified: false });
+    }
+
+    await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(userRef);
+      const freshClaimed = fresh.data().tasksClaimed || {};
+      if (freshClaimed[task.id]) return; // already claimed by a concurrent request
+      tx.update(userRef, {
+        balance: admin.firestore.FieldValue.increment(task.reward),
+        [`tasksClaimed.${task.id}`]: true,
+      });
+    });
+
+    res.json({ ok: true, verified: true, reward: task.reward });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
 // ---------- health check ----------
-app.get("/", (req, res) => res.send("TapEarn backend is running."));
+app.get("/", (req, res) => res.send("CrypStore backend is running."));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

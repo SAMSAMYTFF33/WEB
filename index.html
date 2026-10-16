@@ -359,8 +359,8 @@ const LOCAL_TASKS = [
     description: "Create an account on forumok.com",
     reward: 500,
     actionUrl: "https://forumok.com",
-    requiresProof: true,
-    proofPlaceholder: "Your forumok username",
+    minSeconds: 35,
+    requiresProof: false,
     completed: false,
   },
 ];
@@ -739,7 +739,7 @@ function renderTasks() {
       ? `<div class="task-proof"><input class="input task-proof-input" dir="ltr" placeholder="${escapeHtml(task.proofPlaceholder || "Your username")}" autocomplete="off"></div>`
       : "";
     return `
-      <div class="task-card ${isWebsite ? "website" : ""}" data-task-id="${escapeHtml(task.id)}" data-type="${escapeHtml(task.type || "telegram_channel")}">
+      <div class="task-card ${isWebsite ? "website" : ""}" data-task-id="${escapeHtml(task.id)}" data-type="${escapeHtml(task.type || "telegram_channel")}" data-wait="${Number(task.minSeconds) || 0}">
         ${head}
         <div class="task-actions">
           <button class="btn btn-primary task-open-btn" data-url="${escapeHtml(task.actionUrl || "")}">${isWebsite ? ICON_EXT : ""}${openLabel}</button>
@@ -748,6 +748,22 @@ function renderTasks() {
         ${proof}
       </div>`;
   }).join("");
+}
+
+function startCountdown(btn, seconds) {
+  if (!btn) return;
+  clearInterval(btn._cd);
+  let left = seconds;
+  btn.disabled = true;
+  btn.textContent = `Verify (${left}s)`;
+  btn._cd = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(btn._cd);
+      btn.disabled = false;
+      btn.textContent = "Verify";
+    } else btn.textContent = `Verify (${left}s)`;
+  }, 1000);
 }
 
 async function loadTasks() {
@@ -782,6 +798,16 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
     const verifyEl = card.querySelector(".task-verify-btn");
     if (verifyEl) verifyEl.style.display = "flex";
     card.querySelector(".task-proof")?.classList.add("show");
+    const wait = parseInt(card.dataset.wait || "0", 10);
+    if (wait > 0) {
+      // نبلغ السيرفر بلحظة فتح الموقع — هو من يحسب الـ 35 ثانية
+      fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+        body: JSON.stringify({ taskId: card.dataset.taskId }),
+      }).catch(() => {});
+      startCountdown(verifyEl, wait);
+    }
     return;
   }
 
@@ -804,6 +830,19 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "verification failed");
 
+      if (data.wait) {
+        showToast(`Please wait ${data.wait}s before verifying`);
+        startCountdown(verifyBtn, data.wait);
+        return;
+      }
+      if (data.notStarted) {
+        showToast("Open the website first");
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "Verify";
+        card.querySelector(".task-open-btn").style.display = "flex";
+        verifyBtn.style.display = "none";
+        return;
+      }
       if (data.pending) {
         showToast("Submitted — pending review");
         verifyBtn.textContent = "Pending review";

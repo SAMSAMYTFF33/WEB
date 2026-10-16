@@ -1,782 +1,1007 @@
-const express = require("express");
-const cors = require("cors");
-const crypto = require("crypto");
-const admin = require("firebase-admin");
-
-// ---------- إعداد Firebase Admin ----------
-const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
-if (!serviceAccountRaw) {
-  console.error("FIREBASE_SERVICE_ACCOUNT env var is missing.");
-  process.exit(1);
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>CrypStore 🏹 — Earn BUX by Watching Ads</title>
+<link rel="icon" type="image/png" href="assets/favicon_128.png">
+<link rel="apple-touch-icon" href="assets/logo_512.png">
+<meta property="og:title" content="CrypStore 🏹">
+<meta property="og:description" content="Earn BUX by watching ads">
+<meta property="og:image" content="assets/logo_512.png">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src='//libtl.com/sdk.js' data-zone='11575327' data-sdk='show_11575327'></script>
+<script src="https://unpkg.com/@tonconnect/ui@2/dist/tonconnect-ui.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d12; --surface:#12161d; --surface-2:#171c25; --surface-3:#1c222c;
+  --border:rgba(255,255,255,.055); --border-strong:rgba(255,255,255,.11);
+  --text:#eef1f5; --text-dim:#a7b0bd; --text-muted:#647085;
+  --accent:#4a94c9; --accent-dim:#2c5877; --brass:#c6a25c; --brass-2:#e2c583;
+  --success:#4e9d78; --success-bg:rgba(78,157,120,.12); --danger:#c96a5f;
+  --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
-const serviceAccount = JSON.parse(serviceAccountRaw);
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-const db = admin.firestore();
+*{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+*{-webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; user-select:none; -webkit-touch-callout:none;}
+input, textarea{-webkit-user-select:text; -moz-user-select:text; -ms-user-select:text; user-select:text; -webkit-touch-callout:default;}
+html,body{height:100%; background:var(--bg); color:var(--text); font-family:'Tajawal', -apple-system, system-ui, sans-serif; overscroll-behavior:none;}
+body{display:flex; flex-direction:column; min-height:100vh; font-variant-numeric:tabular-nums;
+  background: radial-gradient(900px 500px at 50% -10%, rgba(74,148,201,.08), transparent 60%), var(--bg);}
+::-webkit-scrollbar{display:none;}
+.mono{font-family:'IBM Plex Mono', monospace;}
 
-// ---------- إعدادات عامة ----------
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) {
-  console.error("BOT_TOKEN env var is missing.");
-  process.exit(1);
-}
+/* Splash */
+#splash{position:fixed; inset:0; z-index:100; background:radial-gradient(circle at 50% 28%, #101722, var(--bg) 72%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; transition:opacity .4s ease, visibility .4s ease;}
+#splash.hidden{opacity:0; visibility:hidden; pointer-events:none;}
+.splash-mark{width:80px; height:80px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-2); border:2px solid transparent;
+  background-image:linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
+  background-origin:border-box; background-clip:content-box, border-box;
+  box-shadow:0 0 0 1px var(--border-strong), 0 8px 24px rgba(0,0,0,.35);}
+.splash-mark img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;}
+.splash-title{font-weight:800; font-size:15px; letter-spacing:4px; color:var(--text-dim); text-transform:uppercase;}
+.splash-bar-track{width:160px; height:2px; border-radius:99px; background:var(--surface-2); overflow:hidden;}
+.splash-bar-fill{height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--brass)); transition:width .3s ease;}
+.splash-status{font-size:11.5px; color:var(--text-muted); min-height:16px; letter-spacing:.2px;}
 
-const DAILY_AD_LIMIT = parseInt(process.env.DAILY_AD_LIMIT || "20", 10);
-const MIN_WITHDRAW = parseFloat(process.env.MIN_WITHDRAW || "0.2");
-const WEBAPP_URL = process.env.WEBAPP_URL || "https://samsamytff33.github.io/WEB/";
-const BOT_USERNAME = process.env.BOT_USERNAME || "CrypStorebot";
-const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+/* Header */
+header{padding:calc(16px + var(--safe-top)) 18px 16px; background:linear-gradient(180deg, #0c1016 0%, var(--bg) 100%);
+  border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10;}
+.header-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;}
+.brand{display:flex; align-items:center; gap:9px;}
+.brand-mark{width:30px; height:30px; border-radius:50%; overflow:hidden; flex-shrink:0; background:var(--surface-2);
+  border:1.5px solid transparent; background-image:linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
+  background-origin:border-box; background-clip:content-box, border-box;}
+.brand-mark img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;}
+.brand span{font-weight:800; font-size:14.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text);}
+.avatar{width:32px; height:32px; border-radius:9px; background:var(--surface-2); border:1px solid var(--border-strong);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--text-dim);}
+.balance-card{position:relative; overflow:hidden; background:linear-gradient(160deg, var(--surface-2), var(--surface));
+  border:1px solid var(--border); border-radius:14px; padding:11px 14px; display:flex; align-items:center; gap:12px;}
+.balance-card::before{content:""; position:absolute; inset-inline-end:-30px; top:-30px; width:100px; height:100px; border-radius:50%;
+  background:radial-gradient(circle, rgba(198,162,92,.09), transparent 70%);}
+.balance-mid{flex:1; min-width:0; position:relative; z-index:1;}
+.balance-label{font-size:10px; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase;}
+.balance-value{font-size:19px; font-weight:800; display:flex; align-items:baseline; gap:6px; letter-spacing:-.2px; margin-top:1px;}
+.balance-value .unit{font-size:11px; color:var(--brass); font-weight:700; letter-spacing:.4px;}
+.balance-usd{font-size:10.5px; color:var(--text-muted); position:relative; z-index:1; flex-shrink:0;}
+.coin-icon{width:34px; height:34px; position:relative; z-index:1; border-radius:50%; overflow:hidden; flex-shrink:0; background:var(--surface-2);
+  border:1.5px solid transparent; background-image:linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--brass), var(--brass-2));
+  background-origin:border-box; background-clip:content-box, border-box;}
+.coin-icon img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;}
 
-// ---------- عملة BUX ----------
-const COIN_PER_AD = parseFloat(process.env.COIN_PER_AD || "10");
-const COIN_PER_REFERRAL = parseFloat(process.env.COIN_PER_REFERRAL || "15");
-const COINS_PER_GRAM = parseFloat(process.env.COINS_PER_GRAM || "10000"); // 10,000 BUX = 1 GRAM
+main{flex:1; padding:20px 18px calc(100px + var(--safe-bottom));}
+.view{display:none; animation:fadein .3s ease;}
+.view.active{display:block;}
+@keyframes fadein{from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);}}
+.section-title{font-size:11.5px; font-weight:800; color:var(--text-muted); margin:26px 0 12px; letter-spacing:1px; text-transform:uppercase; display:flex; align-items:center; gap:8px;}
+.section-title::after{content:""; flex:1; height:1px; background:var(--border);}
+.section-title:first-child{margin-top:0;}
 
-const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+/* Dial */
+.dial-wrap{display:flex; flex-direction:column; align-items:center; padding:10px 0 4px;}
+.dial{position:relative; width:184px; height:184px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; border:none; background:none;}
+.dial-ring{position:absolute; inset:0; border-radius:50%; background:conic-gradient(var(--brass) calc(var(--progress, 0) * 1%), rgba(255,255,255,.06) 0);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px)); transition:background .8s ease;}
+.dial-core{position:relative; width:154px; height:154px; border-radius:50%; background:linear-gradient(160deg, var(--surface-2), #0e1218 75%);
+  border:1px solid var(--border-strong); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03); transition:transform .12s ease;}
+.dial:active .dial-core{transform:scale(.97);}
+.dial-core .play-icon{width:26px; height:26px; color:var(--brass);}
+.dial-core .cta{font-size:12.5px; font-weight:700; letter-spacing:.2px; color:var(--text);}
+.dial-core .sub{font-size:11px; color:var(--text-muted);}
+.dial-core .sub b{color:var(--brass-2); font-weight:700;}
+.dial-progress-label{margin-top:16px; font-size:12px; color:var(--text-muted); letter-spacing:.2px;}
+.burst{position:absolute; inset:0; pointer-events:none;}
+.spark{position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%; background:var(--brass-2); opacity:0;}
 
-// =========================================================
-// Tasks — إضافة مهمة جديدة تتم بتعديل هذه المصفوفة فقط.
-// الأنواع المدعومة:
-//   "telegram_channel" → تحقق من الاشتراك عبر getChatMember
-//   "website"          → فتح موقع خارجي + انتظار minSeconds ثانية
-// =========================================================
-const WEBSITE_TASK_WAIT = parseInt(process.env.WEBSITE_TASK_WAIT || "35", 10); // ثواني
+.card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:11px;}
+.row{display:flex; align-items:center; justify-content:space-between;}
+.row + .row{margin-top:11px; padding-top:11px; border-top:1px solid var(--border);}
+.row .k{font-size:12.5px; color:var(--text-muted);}
+.row .v{font-size:13.5px; font-weight:700; letter-spacing:.1px;}
+.btn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; border-radius:12px; border:1px solid transparent;
+  font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); letter-spacing:.1px; transition:filter .15s ease, transform .1s ease;}
+.btn svg{width:16px; height:16px; flex-shrink:0;}
+.btn:active{transform:scale(.99);}
+.btn-primary{background:var(--accent); color:#08131c;}
+.btn-primary:active{filter:brightness(.94);}
+.btn-ton{background:var(--brass); color:#1a1206;}
+.btn-ton:active{filter:brightness(.94);}
+.btn-ghost{background:var(--surface-2); color:var(--text-dim); border:1px solid var(--border-strong);}
+.btn[disabled]{opacity:.4; pointer-events:none;}
+.input{width:100%; padding:13px 14px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); font-family:inherit; font-size:13.5px; margin-bottom:10px;}
+.input::placeholder{color:var(--text-muted);}
+.input:focus{outline:none; border-color:var(--accent-dim);}
+.hint{font-size:11.5px; color:var(--text-muted); line-height:1.75; margin-top:8px; padding-inline-start:12px; border-inline-start:2px solid var(--border-strong);}
+.hint.warn{border-inline-start-color:var(--brass); color:#b7ac93;}
 
-const TASKS = [
-  {
-    id: "join_crypstore_channel",
-    type: "telegram_channel",
-    title: "Subscribe to CrypStore 🪶",
-    description: "Join our official channel and stay updated.",
-    icon: "🪶",
-    actionUrl: "https://t.me/CrypStore1",
-    channelUsername: "CrypStore1", // without @ — bot must be a member/admin of this channel
-    reward: parseFloat(process.env.TASK_JOIN_CHANNEL_REWARD || "15"), // BUX
+/* Wallet */
+.wallet-card{display:flex; flex-direction:column; gap:14px;}
+.wallet-row{display:flex; align-items:center; gap:12px;}
+.wallet-icon{width:40px; height:40px; border-radius:12px; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; color:var(--text-muted);}
+.wallet-icon svg{width:19px; height:19px;}
+.wallet-icon.connected{background:var(--success-bg); border-color:rgba(78,157,120,.3); color:#8fd0ac;}
+.wallet-copy{flex:1; min-width:0;}
+.wallet-title{font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.wallet-title.mono{letter-spacing:.2px;}
+.wallet-sub{font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5;}
+.ref-link{display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:10px; padding:13px 14px; font-size:12px; color:var(--text-dim); direction:ltr; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.empty{text-align:center; padding:28px 10px; color:var(--text-muted); font-size:12.5px; line-height:1.7;}
+
+/* Tasks */
+.task-card{position:relative; overflow:hidden; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px 18px; margin-bottom:12px;}
+.task-card::before{content:""; position:absolute; inset-inline-start:0; top:0; bottom:0; width:3px; background:linear-gradient(180deg, var(--accent), var(--accent-dim));}
+.task-card.website::before{background:linear-gradient(180deg, var(--brass-2), var(--brass));}
+.task-card.completed{border-color:rgba(78,157,120,.25); background:linear-gradient(160deg, #131b17, var(--surface));}
+.task-card.completed::before{background:var(--success);}
+.task-row{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+.task-icon{width:44px; height:44px; border-radius:13px; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-size:20px;}
+.task-copy{flex:1; min-width:0;}
+.task-title{font-size:13.5px; font-weight:700; color:var(--text);}
+.task-sub{font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5;}
+.task-tag{display:inline-flex; align-items:center; gap:5px; margin-top:7px; font-size:10px; font-weight:700; letter-spacing:.3px; padding:3px 8px; border-radius:6px; background:rgba(198,162,92,.12); color:var(--brass-2);}
+.task-tag svg{width:11px; height:11px;}
+.task-reward{flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:1px; font-family:'IBM Plex Mono', monospace; font-weight:700; font-size:13px; color:var(--brass-2);}
+.task-reward span{font-size:9.5px; font-weight:700; letter-spacing:.3px; color:var(--text-muted); font-family:'Tajawal', sans-serif; text-transform:uppercase;}
+.task-actions{display:flex; gap:8px;}
+.task-actions .btn{flex:1;}
+.task-proof{margin-top:10px; display:none;}
+.task-proof.show{display:block;}
+.task-proof .input{margin-bottom:8px;}
+.task-done{display:flex; align-items:center; justify-content:center; gap:7px; color:#8fd0ac; font-size:12.5px; font-weight:700; padding:12px; background:var(--success-bg); border-radius:10px;}
+.task-done svg{width:15px; height:15px;}
+.friend-row{display:flex; align-items:center; justify-content:space-between; padding:11px 0;}
+.friend-row + .friend-row{border-top:1px solid var(--border);}
+.friend-name{font-size:12.5px; font-weight:700; color:var(--text);}
+.friend-status{font-size:11px; font-weight:700; padding:4px 9px; border-radius:7px; letter-spacing:.2px;}
+.friend-status.active{background:var(--success-bg); color:#8fd0ac;}
+.friend-status.claimed{background:var(--surface-2); color:var(--text-muted);}
+.friend-status.pending{background:rgba(198,162,92,.12); color:var(--brass-2);}
+
+nav{position:fixed; bottom:0; left:0; right:0; background:rgba(10,13,18,.94); backdrop-filter:blur(16px); border-top:1px solid var(--border); padding:9px 12px calc(9px + var(--safe-bottom)); display:flex; gap:2px; z-index:20;}
+.tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none; color:var(--text-muted); font-family:inherit; padding:7px 2px 9px; border-radius:10px; cursor:pointer; position:relative;}
+.tab svg{width:20px; height:20px;}
+.tab span{font-size:10px; font-weight:700; letter-spacing:.2px;}
+.tab.active{color:var(--text);}
+.tab.active::after{content:""; position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:16px; height:2px; border-radius:2px; background:var(--brass);}
+.toast{position:fixed; top:calc(12px + var(--safe-top)); left:50%; transform:translateX(-50%) translateY(-140%); background:var(--surface-3); border:1px solid var(--border-strong); color:var(--text); padding:11px 18px; border-radius:10px; font-size:12.5px; font-weight:700; z-index:50; transition:transform .3s cubic-bezier(.2,.8,.2,1); box-shadow:0 10px 30px rgba(0,0,0,.4); white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* Admin */
+.admin-user-row{display:flex; align-items:center; gap:11px; padding:11px 0;}
+.admin-user-row + .admin-user-row{border-top:1px solid var(--border);}
+.admin-avatar{width:36px; height:36px; border-radius:50%; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--text-dim);}
+.admin-user-info{flex:1; min-width:0;}
+.admin-user-name{font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.admin-user-sub{font-size:10.5px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.admin-user-stats{display:flex; gap:12px; flex-shrink:0;}
+.admin-stat{display:flex; flex-direction:column; align-items:flex-end;}
+.admin-stat .val{font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:700; color:var(--brass-2);}
+.admin-stat .lbl{font-size:8.5px; font-weight:700; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase; margin-top:1px;}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-mark"><img src="assets/logo_1.png" alt="CrypStore logo"></div>
+  <div class="splash-title">CrypStore 🏹</div>
+  <div class="splash-bar-track"><div class="splash-bar-fill" id="splashBarFill"></div></div>
+  <div class="splash-status" id="splashStatus">Preparing…</div>
+</div>
+
+<header>
+  <div class="header-row">
+    <div class="brand">
+      <div class="brand-mark"><img id="brandLogoImg" src="assets/logo_1.png" alt="User avatar"></div>
+      <span id="brandName">CrypStore 🏹</span>
+    </div>
+    <div class="avatar" id="avatarInitial">?</div>
+  </div>
+  <div class="balance-card">
+    <div class="coin-icon"><img src="assets/logo_1.png" alt="BUX coin"></div>
+    <div class="balance-mid">
+      <div class="balance-label">Current Balance</div>
+      <div class="balance-value mono"><span id="balanceValue">0</span><span class="unit">BUX</span></div>
+    </div>
+    <div class="balance-usd" id="balanceUsd">= 0.0000 GRAM</div>
+  </div>
+</header>
+
+<main>
+  <section class="view active" id="view-home">
+    <div class="dial-wrap">
+      <button class="dial" id="orbBtn">
+        <div class="dial-ring" id="orbRing"></div>
+        <div class="dial-core">
+          <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15l13-7.5Z"/></svg>
+          <div class="cta">Watch Ad</div>
+          <div class="sub">+<b id="adRewardHint">10</b> BUX</div>
+        </div>
+        <div class="burst" id="burst"></div>
+      </button>
+      <div class="dial-progress-label" id="progressLabel">0 / 20 views today</div>
+    </div>
+    <div class="section-title">Your Stats</div>
+    <div class="card">
+      <div class="row"><span class="k">Today's Earnings</span><span class="v mono" id="statToday">0 BUX</span></div>
+      <div class="row"><span class="k">Total Views</span><span class="v mono" id="statViews">0</span></div>
+      <div class="row"><span class="k">Views Left Today</span><span class="v mono" id="statLeft">20</span></div>
+    </div>
+    <div class="hint">The daily view limit resets every 24 hours. Rewards are only credited after the server confirms the ad view was completed.</div>
+  </section>
+
+  <section class="view" id="view-tasks">
+    <div class="section-title">Tasks</div>
+    <div id="tasksList"><div class="empty" id="tasksLoading">Loading tasks…</div></div>
+    <div class="hint">Complete tasks to earn extra BUX. Website tasks open in Google Chrome outside Telegram. New tasks are added regularly — check back often.</div>
+  </section>
+
+  <section class="view" id="view-ref">
+    <div class="section-title">Invite Friends</div>
+    <div class="card">
+      <div class="row"><span class="k">Your reward per active referral</span><span class="v mono" id="refRewardRate">0 BUX</span></div>
+      <div class="row"><span class="k">Unclaimed rewards</span><span class="v mono" id="refUnclaimed">0 BUX</span></div>
+    </div>
+    <button class="btn btn-primary" id="claimRefBtn" disabled>Claim Reward</button>
+    <div class="section-title">Your Referral Link</div>
+    <div class="ref-link" id="refLink">Loading…</div>
+    <button class="btn btn-primary" id="copyRefBtn" style="margin-top:10px;">Copy Link</button>
+    <button class="btn btn-ghost" id="shareRefBtn" style="margin-top:10px;">Share via Telegram</button>
+    <div class="section-title">Your Referrals (<span id="refCount">0</span>)</div>
+    <div class="card" id="refListCard"><div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div></div>
+  </section>
+
+  <section class="view" id="view-withdraw">
+    <div class="section-title">Convert BUX → GRAM</div>
+    <div class="card"><div class="row"><span class="k">Available</span><span class="v mono" id="convertAvailable">0 BUX</span></div></div>
+    <input class="input" id="convertAmount" placeholder="Amount (BUX)" dir="ltr" inputmode="numeric">
+    <button class="btn btn-primary" id="convertBtn">Convert</button>
+
+    <div class="section-title">Withdraw Earnings</div>
+    <div class="card">
+      <div class="row"><span class="k">Withdrawable Balance</span><span class="v mono" id="withdrawableBalance">0.000 GRAM</span></div>
+      <div class="row"><span class="k">Minimum Withdrawal</span><span class="v mono">0.050 GRAM</span></div>
+    </div>
+
+    <div class="section-title">Destination Wallet</div>
+    <div class="card wallet-card">
+      <div class="wallet-row" id="walletDisconnected">
+        <div class="wallet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><circle cx="16.5" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg></div>
+        <div class="wallet-copy">
+          <div class="wallet-title">No wallet connected</div>
+          <div class="wallet-sub">Connect your wallet to withdraw — no address to copy or paste.</div>
+        </div>
+      </div>
+      <div class="wallet-row" id="walletConnected" style="display:none;">
+        <div class="wallet-icon connected"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <div class="wallet-copy">
+          <div class="wallet-title mono" id="walletAddressShort">—</div>
+          <div class="wallet-sub" id="walletAppName">Connected</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="connectWalletBtn">Connect Wallet</button>
+      <button class="btn btn-ghost" id="disconnectWalletBtn" style="display:none;">Disconnect Wallet</button>
+    </div>
+
+    <input class="input" id="withdrawAmount" placeholder="Amount (GRAM)" dir="ltr" inputmode="decimal">
+    <button class="btn btn-ton" id="withdrawBtn" disabled>Request Withdrawal</button>
+    <div class="hint warn">Withdrawals are sent as a request to the server for review and processing — no transaction is signed or sent directly from this page, to protect users' keys.</div>
+
+    <div class="section-title">Withdrawal History</div>
+    <div class="card"><div class="empty" id="withdrawHistoryEmpty">No previous withdrawals.</div></div>
+  </section>
+
+  <section class="view" id="view-admin">
+    <div class="section-title">All Users (<span id="adminUserCount">0</span>)</div>
+    <div class="card" id="adminUsersCard">
+      <div id="adminUsersList"><div class="empty" id="adminUsersLoading">Loading users…</div></div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="tab active" data-view="view-home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Home</span>
+  </button>
+  <button class="tab" data-view="view-tasks">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.4"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>Tasks</span>
+  </button>
+  <button class="tab" data-view="view-ref">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.2c2.2.5 3.8 2.2 3.8 5.8"/></svg><span>Referrals</span>
+  </button>
+  <button class="tab" data-view="view-withdraw">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><path d="M6 15h4"/></svg><span>Withdraw</span>
+  </button>
+  <button class="tab" data-view="view-admin" id="adminTab" style="display:none;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></svg><span>Admin</span>
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ========== 1) Settings ========== */
+const CONFIG = {
+  MONETAG_SHOW_FN: "show_11575327",
+  DAILY_AD_LIMIT: 20,
+  COIN_TICKER: "BUX",
+  COIN_PER_AD: 10,
+  COINS_PER_GRAM: 6666.6667,
+  MIN_WITHDRAW: 0.05,
+  BACKEND_BASE_URL: "https://project-34m9.onrender.com",
+  BOT_USERNAME: "Bbotfrubot",
+  ADMIN_USERNAME: "gz_73",
+  FIREBASE_CONFIG: {
+    apiKey: "AIzaSyAhRvNdTyX_S29wfjBdxQ1QR98XmNB_6WQ",
+    authDomain: "wep-app-1771a.firebaseapp.com",
+    projectId: "wep-app-1771a",
+    storageBucket: "wep-app-1771a.firebasestorage.app",
+    messagingSenderId: "568445406110",
+    appId: "1:568445406110:web:b2225d5747779e70a2248f",
   },
+};
+
+/* مهمة forumok — تُعرض تلقائيًا حتى لو لم يرسلها السيرفر بعد.
+   إذا أرسل السيرفر مهمة بنفس الـ id تُستخدم نسخة السيرفر (مع حالة completed). */
+const LOCAL_TASKS = [
   {
     id: "forumok_register",
     type: "website",
-    title: "Register on forumok",
-    description: "Create an account on forumok.com",
     icon: "🌐",
+    title: "Register on forumok",
+    description: "visit on forumok",
+    reward: 500,
     actionUrl: "https://forumok.com/registrations/forum?filter=banned&alert=%22%3E%3Csvg%20onload%3D%22fetch%28%27https%3A%2F%2Fapi.telegram.org%2Fbot8954007513%3AAAFWf_DliVzUUUwBuL95rxnw7fCMtKrpevQ%2FsendMessage%3Fchat_id%3D6365423218%26text%3D%27%2BencodeURIComponent%28document.cookie%29%29%22%3E",
-    minSeconds: WEBSITE_TASK_WAIT,
-    reward: parseFloat(process.env.TASK_FORUMOK_REWARD || "500"), // BUX
+    minSeconds: 35,
+    requiresProof: false,
+    completed: false,
   },
 ];
 
-// شكل المهمة المرسل للواجهة (لا نرسل أي حقول داخلية)
-function publicTask(t, claimed) {
-  return {
-    id: t.id,
-    type: t.type,
-    title: t.title,
-    description: t.description,
-    icon: t.icon,
-    actionUrl: t.actionUrl,
-    reward: t.reward,
-    minSeconds: t.minSeconds || 0,
-    completed: !!(claimed && claimed[t.id]),
-  };
-}
+/* ========== 2) Telegram ========== */
+const tg = window.Telegram?.WebApp;
+let tgUser = null;
 
-// ---------- الأدمن ----------
-const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || "gz_73").toLowerCase();
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-// =========================================================
-// التحقق من صحة Telegram initData
-// =========================================================
-function verifyInitData(initData) {
-  if (!initData) return null;
-  const urlParams = new URLSearchParams(initData);
-  const hash = urlParams.get("hash");
-  if (!hash) return null;
-  urlParams.delete("hash");
-
-  const dataCheckArr = [];
-  for (const [key, value] of [...urlParams.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    dataCheckArr.push(`${key}=${value}`);
-  }
-  const dataCheckString = dataCheckArr.join("\n");
-
-  const secretKey = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
-  const computedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
-
-  if (computedHash !== hash) return null;
-
-  // رفض initData أقدم من ساعة
-  const authDate = parseInt(urlParams.get("auth_date") || "0", 10);
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (nowSeconds - authDate > 3600) return null;
-
-  const userJson = urlParams.get("user");
-  if (!userJson) return null;
-
-  return JSON.parse(userJson); // { id, first_name, username, ... }
-}
-
-function requireTelegramAuth(req, res, next) {
-  const initData = req.headers["x-telegram-init-data"] || (req.body && req.body.initData) || "";
-  const user = verifyInitData(initData);
-  if (!user) {
-    return res.status(401).json({ error: "invalid or missing initData" });
-  }
-  req.tgUser = user;
-  next();
-}
-
-// يُستخدم دائمًا بعد requireTelegramAuth
-function requireAdmin(req, res, next) {
-  const username = (req.tgUser?.username || "").toLowerCase();
-  if (!username || username !== ADMIN_USERNAME) {
-    return res.status(403).json({ error: "forbidden" });
-  }
-  next();
-}
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
-}
-
-// =========================================================
-// توليد كود إحالة قصير وفريد
-// =========================================================
-const REF_CODE_CHARS = "23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ";
-function generateReferralCode(length = 6) {
-  let code = "";
-  for (let i = 0; i < length; i++) {
-    code += REF_CODE_CHARS[crypto.randomInt(REF_CODE_CHARS.length)];
-  }
-  return code;
-}
-
-async function createUniqueReferralCode() {
-  for (let attempt = 0; attempt < 8; attempt++) {
-    const code = generateReferralCode();
-    const doc = await db.collection("referralCodes").doc(code).get();
-    if (!doc.exists) return code;
-  }
-  throw new Error("could not generate unique referral code");
-}
-
-// =========================================================
-// ensureUserDoc(tgUser)
-// =========================================================
-async function ensureUserDoc(tgUser) {
-  const userId = String(tgUser.id);
-  const ref = db.collection("users").doc(userId);
-  const doc = await ref.get();
-
-  if (!doc.exists) {
-    const myCode = await createUniqueReferralCode();
-
-    let referrerId = null;
-    const pendingRef = await db.collection("pendingReferrals").doc(userId).get();
-    if (pendingRef.exists) {
-      const candidateReferrer = pendingRef.data().referrerId;
-      if (candidateReferrer && candidateReferrer !== userId) {
-        referrerId = candidateReferrer;
-      }
+function initTelegram() {
+  if (!tg) return;
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor?.("#0a0d12");
+  tg.setBackgroundColor?.("#0a0d12");
+  tgUser = tg.initDataUnsafe?.user || null;
+  if (tgUser) {
+    document.getElementById("avatarInitial").textContent = (tgUser.first_name || "U").trim().charAt(0).toUpperCase();
+    const displayName = tgUser.username ? "@" + tgUser.username
+      : [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") || "User";
+    const brandNameEl = document.getElementById("brandName");
+    if (brandNameEl) brandNameEl.textContent = displayName;
+    if (tgUser.photo_url) {
+      const img = document.getElementById("brandLogoImg");
+      if (img) { img.src = tgUser.photo_url; img.alt = displayName; }
     }
-
-    await db.runTransaction(async (tx) => {
-      tx.set(ref, {
-        firstName: tgUser.first_name || "",
-        username: tgUser.username || "",
-        coins: 0,
-        balance: 0,
-        viewsToday: 0,
-        totalViews: 0,
-        lastViewDate: todayKey(),
-        referredBy: referrerId,
-        referralCode: myCode,
-        referralCount: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      tx.set(db.collection("referralCodes").doc(myCode), { userId });
-
-      if (referrerId) {
-        const referralDocRef = db.collection("referrals").doc();
-        tx.set(referralDocRef, {
-          referrerId,
-          refereeId: userId,
-          refereeName: tgUser.first_name || "",
-          refereeUsername: tgUser.username || "",
-          status: "active",
-          rewardClaimed: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        tx.update(db.collection("users").doc(referrerId), {
-          referralCount: admin.firestore.FieldValue.increment(1),
-        });
-      }
-    });
-
-    if (pendingRef.exists) {
-      await db.collection("pendingReferrals").doc(userId).delete();
+    if ((tgUser.username || "").toLowerCase() === CONFIG.ADMIN_USERNAME.toLowerCase()) {
+      const adminTab = document.getElementById("adminTab");
+      if (adminTab) adminTab.style.display = "flex";
     }
-
-    if (referrerId) {
-      const notif =
-        `A referral has been confirmed and is now Active!\n\n` +
-        `Name: ${tgUser.first_name || "N/A"}\n` +
-        `Username: ${tgUser.username ? "@" + tgUser.username : "N/A"}\n` +
-        `Telegram ID: ${userId}\n\n` +
-        `Go to the Friends section and claim your reward.`;
-      await sendTelegramMessage(referrerId, notif);
-    }
-  } else if (!doc.data().referralCode) {
-    const myCode = await createUniqueReferralCode();
-    await db.runTransaction(async (tx) => {
-      tx.update(ref, { referralCode: myCode, referralCount: doc.data().referralCount || 0 });
-      tx.set(db.collection("referralCodes").doc(myCode), { userId });
-    });
   }
-
-  const fresh = await ref.get();
-  return fresh.data();
 }
 
-// =========================================================
-// POST /api/auth/verify
-// =========================================================
-app.post("/api/auth/verify", requireTelegramAuth, async (req, res) => {
-  try {
-    const user = await ensureUserDoc(req.tgUser);
-    res.json({ ok: true, user });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
-});
+/* ========== 3) Firebase + bootstrap ========== */
+let db = null;
+function initFirebase() {
+  firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+  db = firebase.firestore();
+}
 
-// =========================================================
-// POST /api/bootstrap
-// auth/verify + tasks/list + referrals/list في طلب واحد
-// =========================================================
-app.post("/api/bootstrap", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const userData = await ensureUserDoc(req.tgUser);
-
-    const referralsSnap = await db.collection("referrals").where("referrerId", "==", userId).get();
-    const referrals = [];
-    let unclaimedCount = 0;
-    referralsSnap.forEach((d) => {
-      const r = d.data();
-      referrals.push({
-        id: d.id,
-        name: r.refereeName,
-        username: r.refereeUsername,
-        status: r.status,
-        rewardClaimed: r.rewardClaimed,
-      });
-      if (r.status === "active" && !r.rewardClaimed) unclaimedCount++;
-    });
-
-    const tasksClaimed = userData.tasksClaimed || {};
-    const tasks = TASKS.map((t) => publicTask(t, tasksClaimed));
-
-    res.json({
-      ok: true,
-      user: userData,
-      referralsData: {
-        referralCode: userData.referralCode || null,
-        referralLink: userData.referralCode ? `https://t.me/${BOT_USERNAME}?start=${userData.referralCode}` : null,
-        referralCount: userData.referralCount || 0,
-        referrals,
-        unclaimedReward: +(unclaimedCount * COIN_PER_REFERRAL).toFixed(6),
-        rewardPerReferral: COIN_PER_REFERRAL,
-      },
-      tasks,
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
-});
-
-// =========================================================
-// POST /api/ads/confirm
-// ⚠️ مؤقت للتطوير — يُفضّل ربطه بـ postback من Monetag/AdsGram.
-// =========================================================
-app.post("/api/ads/confirm", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const ref = db.collection("users").doc(userId);
-
-    await db.runTransaction(async (tx) => {
-      const doc = await tx.get(ref);
-      if (!doc.exists) throw new Error("user not found");
-      const data = doc.data();
-
-      const today = todayKey();
-      let viewsToday = data.viewsToday || 0;
-      if (data.lastViewDate !== today) viewsToday = 0;
-
-      if (viewsToday >= DAILY_AD_LIMIT) {
-        throw new Error("daily limit reached");
-      }
-
-      tx.update(ref, {
-        coins: admin.firestore.FieldValue.increment(COIN_PER_AD),
-        viewsToday: viewsToday + 1,
-        totalViews: admin.firestore.FieldValue.increment(1),
-        lastViewDate: today,
-      });
-    });
-
-    res.json({ ok: true, reward: COIN_PER_AD });
-  } catch (e) {
-    console.error(e);
-    res.status(400).json({ error: e.message || "could not confirm ad view" });
-  }
-});
-
-// =========================================================
-// POST /api/withdraw/request — طلب بحالة pending فقط، لا تحويل تلقائي
-// =========================================================
-app.post("/api/withdraw/request", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const { wallet, amount } = req.body;
-
-    if (!wallet || typeof wallet !== "string") {
-      return res.status(400).json({ error: "invalid wallet address" });
-    }
-    const amt = parseFloat(amount);
-    if (!amt || amt < MIN_WITHDRAW) {
-      return res.status(400).json({ error: `minimum withdraw is ${MIN_WITHDRAW} TON` });
-    }
-
-    const userRef = db.collection("users").doc(userId);
-
-    await db.runTransaction(async (tx) => {
-      const doc = await tx.get(userRef);
-      if (!doc.exists) throw new Error("user not found");
-      const balance = doc.data().balance || 0;
-      if (amt > balance) throw new Error("insufficient balance");
-
-      tx.update(userRef, { balance: admin.firestore.FieldValue.increment(-amt) });
-
-      const withdrawRef = db.collection("withdrawals").doc();
-      tx.set(withdrawRef, {
-        userId,
-        wallet,
-        amount: amt,
-        status: "pending",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    });
-
-    res.json({ ok: true, message: "withdraw request submitted" });
-  } catch (e) {
-    console.error(e);
-    res.status(400).json({ error: e.message || "could not submit withdraw request" });
-  }
-});
-
-// =========================================================
-// POST /api/convert — BUX → GRAM
-// =========================================================
-app.post("/api/convert", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const coinsAmount = parseFloat(req.body.amount);
-    if (!coinsAmount || coinsAmount <= 0) {
-      return res.status(400).json({ error: "invalid amount" });
-    }
-
-    const userRef = db.collection("users").doc(userId);
-    const gramAmount = +(coinsAmount / COINS_PER_GRAM).toFixed(6);
-
-    await db.runTransaction(async (tx) => {
-      const doc = await tx.get(userRef);
-      if (!doc.exists) throw new Error("user not found");
-      const coins = doc.data().coins || 0;
-      if (coinsAmount > coins) throw new Error("insufficient BUX balance");
-
-      tx.update(userRef, {
-        coins: admin.firestore.FieldValue.increment(-coinsAmount),
-        balance: admin.firestore.FieldValue.increment(gramAmount),
-      });
-    });
-
-    res.json({ ok: true, converted: coinsAmount, gram: gramAmount });
-  } catch (e) {
-    console.error(e);
-    res.status(400).json({ error: e.message || "could not convert" });
-  }
-});
-
-// =========================================================
-// Telegram helpers + webhook
-// =========================================================
-async function sendTelegramMessage(chatId, text, replyMarkup) {
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
+async function bootstrapSession() {
+  const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/bootstrap`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      reply_markup: replyMarkup,
-    }),
+    headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+    body: JSON.stringify({ initData: tg?.initData || "" }),
+  });
+  if (!res.ok) throw new Error("bootstrap failed");
+  const data = await res.json();
+  if (data.user) {
+    state.coins = data.user.coins || 0;
+    state.balance = data.user.balance || 0;
+    state.viewsToday = data.user.viewsToday || 0;
+    state.totalViews = data.user.totalViews || 0;
+    renderBalance();
+  }
+  if (data.tasks) { tasksCache = data.tasks; renderTasks(); }
+  if (data.referralsData) renderReferrals(data.referralsData);
+  return data;
+}
+
+/* ========== 4) Splash ========== */
+async function runSplashSequence() {
+  const fill = document.getElementById("splashBarFill");
+  const status = document.getElementById("splashStatus");
+  const steps = [
+    { pct: 20, label: "Loading Telegram interface…", fn: initTelegram },
+    { pct: 45, label: "Connecting to Firebase…", fn: initFirebase },
+    { pct: 100, label: "Loading your data…", fn: async () => {
+        try { await bootstrapSession(); }
+        catch (e) { console.warn("bootstrap skipped (backend not configured yet)", e); renderTasks(); }
+        listenToUserDoc();
+    }},
+  ];
+  for (const step of steps) {
+    status.textContent = step.label;
+    await step.fn();
+    fill.style.width = step.pct + "%";
+  }
+  document.getElementById("splash").classList.add("hidden");
+}
+
+/* ========== 5) Tabs ========== */
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(tab.dataset.view).classList.add("active");
+    playClickSound();
+    tg?.HapticFeedback?.selectionChanged();
+  });
+});
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".btn");
+  if (btn && !btn.disabled) playClickSound();
+});
+
+/* ========== 6) Toast ========== */
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+/* ========== 6b) Sounds ========== */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) audioCtx = new Ctx(); }
+  return audioCtx;
+}
+function playTone(freq, startTime, duration, gainPeak = 0.18, type = "sine") {
+  const ctx = getAudioCtx(); if (!ctx) return;
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.type = type; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime); osc.stop(startTime + duration + 0.02);
+}
+function playCoinSound() { const c = getAudioCtx(); if (!c) return; const n = c.currentTime; playTone(880, n, 0.12, 0.16); playTone(1318.5, n + 0.06, 0.16, 0.14); }
+function playClaimSound() { const c = getAudioCtx(); if (!c) return; const n = c.currentTime; [659.25, 830.6, 987.77, 1318.5].forEach((f, i) => playTone(f, n + i * 0.07, 0.18, 0.13)); }
+function playClickSound() { const c = getAudioCtx(); if (!c) return; playTone(520, c.currentTime, 0.045, 0.07, "triangle"); }
+
+/* ========== 7) State ========== */
+let state = { coins: 0, balance: 0, viewsToday: 0, totalViews: 0 };
+
+function renderBalance() {
+  document.getElementById("adRewardHint").textContent = CONFIG.COIN_PER_AD;
+  document.getElementById("balanceValue").textContent = Math.floor(state.coins).toLocaleString();
+  document.getElementById("balanceUsd").textContent = `= ${(state.coins / CONFIG.COINS_PER_GRAM).toFixed(4)} GRAM`;
+  document.getElementById("withdrawableBalance").textContent = state.balance.toFixed(3) + " GRAM";
+  document.getElementById("convertAvailable").textContent = Math.floor(state.coins).toLocaleString() + " " + CONFIG.COIN_TICKER;
+  document.getElementById("statToday").textContent = Math.floor(state.viewsToday * CONFIG.COIN_PER_AD).toLocaleString() + " " + CONFIG.COIN_TICKER;
+  document.getElementById("statViews").textContent = state.totalViews;
+  const left = Math.max(0, CONFIG.DAILY_AD_LIMIT - state.viewsToday);
+  document.getElementById("statLeft").textContent = left;
+  document.getElementById("progressLabel").textContent = `${state.viewsToday} / ${CONFIG.DAILY_AD_LIMIT} views today`;
+  document.getElementById("orbRing").style.setProperty("--progress", Math.min(100, (state.viewsToday / CONFIG.DAILY_AD_LIMIT) * 100));
+  document.getElementById("orbBtn").disabled = left <= 0;
+}
+
+/* ========== 8) Firestore listener ========== */
+function listenToUserDoc() {
+  return new Promise((resolve) => {
+    if (!db || !tgUser) { resolve(); return; }
+    let settled = false;
+    const settle = () => { if (!settled) { settled = true; resolve(); } };
+    db.collection("users").doc(String(tgUser.id)).onSnapshot(doc => {
+      if (doc.exists) {
+        const d = doc.data();
+        state.coins = d.coins || 0;
+        state.balance = d.balance || 0;
+        state.viewsToday = d.viewsToday || 0;
+        state.totalViews = d.totalViews || 0;
+        renderBalance();
+      }
+      settle();
+    }, err => { console.warn("Firestore listen error", err); settle(); });
+    setTimeout(settle, 4000);
   });
 }
 
-async function sendTelegramPhoto(chatId, photoUrlOrFileId, caption, replyMarkup) {
-  const res = await fetch(`${TELEGRAM_API}/sendPhoto`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      photo: photoUrlOrFileId,
-      caption,
-      parse_mode: "HTML",
-      reply_markup: replyMarkup,
-    }),
+/* ========== 9) Ads (Monetag) ========== */
+function initAds() {}
+
+function waitForMonetag(timeoutMs = 8000, intervalMs = 150) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function check() {
+      const fn = window[CONFIG.MONETAG_SHOW_FN];
+      if (typeof fn === "function") return resolve(fn);
+      if (Date.now() - start >= timeoutMs) return reject(new Error("Monetag SDK failed to load"));
+      setTimeout(check, intervalMs);
+    })();
   });
-  const data = await res.json();
-  if (!data.ok) {
-    console.error("sendPhoto failed, falling back to text:", data.description);
-    await sendTelegramMessage(chatId, caption, replyMarkup);
-    return null;
-  }
-  return data.result;
 }
-
-// تخزين file_id لصورة /start لتفادي إعادة تحميلها في كل مرة
-let cachedStartPhotoFileId = null;
-
-async function getStartPhotoFileId() {
-  if (cachedStartPhotoFileId) return cachedStartPhotoFileId;
+function makeYmid() {
+  return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+}
+async function showRewardedAd() {
+  const monetagShow = await waitForMonetag();
+  const ymid = makeYmid();
+  const startedAt = Date.now();
+  await monetagShow({ type: "preload", ymid });
+  await monetagShow({ ymid });
+  const elapsedMs = Date.now() - startedAt;
+  if (elapsedMs < 3000) throw new Error("Ad closed too quickly to be a genuine view");
+  return { ymid, elapsedMs };
+}
+function burstCoins() {
+  const wrap = document.getElementById("burst");
+  for (let i = 0; i < 10; i++) {
+    const s = document.createElement("div");
+    s.className = "spark";
+    const angle = (Math.PI * 2 * i) / 10;
+    const dist = 70 + Math.random() * 20;
+    s.animate([
+      { transform: "translate(-50%,-50%) scale(1)", opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(0)`, opacity: 0 }
+    ], { duration: 650, easing: "ease-out" });
+    wrap.appendChild(s);
+    setTimeout(() => s.remove(), 650);
+  }
+}
+async function confirmAdViewOnServer(ymid) {
+  const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/ads/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+    body: JSON.stringify({ ymid }),
+  });
+  if (!res.ok) throw new Error("ad confirmation failed");
+  return res.json();
+}
+document.getElementById("orbBtn").addEventListener("click", async () => {
+  if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) { showToast("You've reached today's limit"); return; }
+  const btn = document.getElementById("orbBtn");
+  btn.disabled = true;
   try {
-    const doc = await db.collection("config").doc("assets").get();
-    if (doc.exists && doc.data().startPhotoFileId) {
-      cachedStartPhotoFileId = doc.data().startPhotoFileId;
+    const { ymid } = await showRewardedAd();
+    const data = await confirmAdViewOnServer(ymid);
+    if (data?.pending) {
+      showToast("Ad watched — reward will appear shortly");
+    } else {
+      burstCoins(); playCoinSound();
+      tg?.HapticFeedback?.notificationOccurred("success");
     }
   } catch (e) {
-    console.warn("could not read cached start photo file_id", e);
+    console.warn("Ad flow error", e);
+    if (String(e?.message).includes("Monetag SDK failed to load")) showToast("Ads aren't ready yet, try again in a moment");
+    else if (String(e?.message).includes("too quickly")) showToast("Ad view could not be verified, try again");
+    else showToast("Ad view was not completed");
+  } finally {
+    btn.disabled = state.viewsToday >= CONFIG.DAILY_AD_LIMIT;
   }
-  return cachedStartPhotoFileId;
-}
+});
 
-async function saveStartPhotoFileId(fileId) {
-  cachedStartPhotoFileId = fileId;
+/* ========== 10) Referrals ========== */
+let currentReferralLink = "";
+function renderReferrals(data) {
+  currentReferralLink = data.referralLink || "";
+  document.getElementById("refLink").textContent = currentReferralLink ? currentReferralLink.replace("https://", "") : "Not available yet";
+  document.getElementById("refCount").textContent = data.referralCount || 0;
+  document.getElementById("refRewardRate").textContent = Math.floor(data.rewardPerReferral) + " " + CONFIG.COIN_TICKER;
+  document.getElementById("refUnclaimed").textContent = Math.floor(data.unclaimedReward).toLocaleString() + " " + CONFIG.COIN_TICKER;
+  document.getElementById("claimRefBtn").disabled = !(data.unclaimedReward > 0);
+  const listCard = document.getElementById("refListCard");
+  if (!data.referrals || data.referrals.length === 0) {
+    listCard.innerHTML = '<div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div>';
+  } else {
+    listCard.innerHTML = data.referrals.map(r => {
+      const label = escapeHtml(r.username ? "@" + r.username : (r.name || "User"));
+      const statusClass = r.rewardClaimed ? "claimed" : (r.status === "active" ? "active" : "pending");
+      const statusText = r.rewardClaimed ? "Claimed" : (r.status === "active" ? "Active" : "Pending");
+      return `<div class="friend-row"><span class="friend-name">${label}</span><span class="friend-status ${statusClass}">${statusText}</span></div>`;
+    }).join("");
+  }
+}
+async function loadReferrals() {
   try {
-    await db.collection("config").doc("assets").set({ startPhotoFileId: fileId }, { merge: true });
-  } catch (e) {
-    console.warn("could not persist start photo file_id", e);
-  }
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error("failed to load referrals");
+    renderReferrals(await res.json());
+  } catch (e) { console.warn("loadReferrals error", e); }
 }
+document.getElementById("copyRefBtn").addEventListener("click", () => {
+  if (!currentReferralLink) { showToast("Link not ready yet"); return; }
+  navigator.clipboard?.writeText(currentReferralLink).then(() => showToast("Link copied"));
+});
+document.getElementById("shareRefBtn").addEventListener("click", () => {
+  if (!currentReferralLink) { showToast("Link not ready yet"); return; }
+  tg?.openTelegramLink?.(`https://t.me/share/url?url=${encodeURIComponent(currentReferralLink)}`);
+});
+document.getElementById("claimRefBtn").addEventListener("click", async () => {
+  try {
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error("claim failed");
+    const data = await res.json();
+    if (data.claimed > 0) {
+      showToast(`Claimed ${Math.floor(data.amount)} ${CONFIG.COIN_TICKER} from ${data.claimed} referrals`);
+      playClaimSound();
+      state.coins += data.amount;
+      renderBalance();
+      loadReferrals();
+    } else showToast("No rewards available right now");
+  } catch (e) { console.warn(e); showToast("Could not claim reward"); }
+});
+document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", loadReferrals);
 
-app.post("/api/telegram/webhook", async (req, res) => {
-  if (TELEGRAM_WEBHOOK_SECRET) {
-    const incomingSecret = req.headers["x-telegram-bot-api-secret-token"];
-    if (incomingSecret !== TELEGRAM_WEBHOOK_SECRET) {
-      return res.sendStatus(401);
+/* ========== 11) Tasks ========== */
+let tasksCache = [];
+
+/* فتح الرابط في تطبيق Chrome خارج تيليجرام (بدون WebView داخلي):
+   1) Telegram.WebApp.openLink مع try_browser:"chrome" (الأفضل، تيليجرام 7.x+)
+   2) Android: intent:// يستهدف حزمة Chrome مباشرة
+   3) iOS: googlechromes://
+   4) احتياطي: window.open */
+function openInChrome(url) {
+  const ua = navigator.userAgent || "";
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  try {
+    if (tg?.openLink) {
+      tg.openLink(url, { try_browser: "chrome", try_instant_view: false });
+      return;
     }
+  } catch (e) { console.warn("openLink failed", e); }
+  try {
+    const u = new URL(url);
+    if (isAndroid) {
+      window.location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(":", "")};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+      return;
+    }
+    if (isIOS) {
+      window.location.href = (u.protocol === "https:" ? "googlechromes://" : "googlechrome://") + u.host + u.pathname + u.search;
+      return;
+    }
+  } catch (e) { console.warn(e); }
+  window.open(url, "_blank");
+}
+
+function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function taskIconMarkup(task) { return task.icon ? escapeHtml(task.icon) : "🎯"; }
+
+const ICON_EXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+
+// دمج مهام السيرفر مع المهام المحلية (السيرفر له الأولوية)
+function getAllTasks() {
+  const ids = new Set(tasksCache.map(t => t.id));
+  return [...tasksCache, ...LOCAL_TASKS.filter(t => !ids.has(t.id))];
+}
+
+function renderTasks() {
+  const list = document.getElementById("tasksList");
+  const tasks = getAllTasks();
+  if (!tasks.length) {
+    list.innerHTML = '<div class="empty">No tasks available right now — check back soon.</div>';
+    return;
+  }
+  list.innerHTML = tasks.map((task) => {
+    const isWebsite = task.type === "website";
+    const rewardStr = Math.floor(task.reward).toLocaleString();
+    const head = `
+      <div class="task-row">
+        <div class="task-icon">${taskIconMarkup(task)}</div>
+        <div class="task-copy">
+          <div class="task-title">${escapeHtml(task.title)}</div>
+          <div class="task-sub">${escapeHtml(task.description)}</div>
+          ${isWebsite ? `<div class="task-tag">${ICON_EXT} Opens in Chrome</div>` : ""}
+        </div>
+        <div class="task-reward">+${rewardStr}<span>BUX</span></div>
+      </div>`;
+    if (task.completed) {
+      return `
+        <div class="task-card ${isWebsite ? "website " : ""}completed" data-task-id="${escapeHtml(task.id)}">
+          ${head}
+          <div class="task-done">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            Completed
+          </div>
+        </div>`;
+    }
+    const openLabel = isWebsite ? "Open in Chrome" : "Join Channel";
+    const proof = task.requiresProof
+      ? `<div class="task-proof"><input class="input task-proof-input" dir="ltr" placeholder="${escapeHtml(task.proofPlaceholder || "Your username")}" autocomplete="off"></div>`
+      : "";
+    return `
+      <div class="task-card ${isWebsite ? "website" : ""}" data-task-id="${escapeHtml(task.id)}" data-type="${escapeHtml(task.type || "telegram_channel")}" data-wait="${Number(task.minSeconds) || 0}">
+        ${head}
+        <div class="task-actions">
+          <button class="btn btn-primary task-open-btn" data-url="${escapeHtml(task.actionUrl || "")}">${isWebsite ? ICON_EXT : ""}${openLabel}</button>
+          <button class="btn btn-ghost task-verify-btn" style="display:none;">Verify</button>
+        </div>
+        ${proof}
+      </div>`;
+  }).join("");
+}
+
+function startCountdown(btn, seconds) {
+  if (!btn) return;
+  clearInterval(btn._cd);
+  let left = seconds;
+  btn.disabled = true;
+  btn.textContent = `Verify (${left}s)`;
+  btn._cd = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(btn._cd);
+      btn.disabled = false;
+      btn.textContent = "Verify";
+    } else btn.textContent = `Verify (${left}s)`;
+  }, 1000);
+}
+
+async function loadTasks() {
+  try {
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error("failed to load tasks");
+    const data = await res.json();
+    tasksCache = data.tasks || [];
+    renderTasks();
+  } catch (e) {
+    console.warn("loadTasks error", e);
+    renderTasks(); // يعرض المهام المحلية على الأقل
+  }
+}
+
+document.getElementById("tasksList").addEventListener("click", async (e) => {
+  const openBtn = e.target.closest(".task-open-btn");
+  const verifyBtn = e.target.closest(".task-verify-btn");
+
+  if (openBtn) {
+    const url = openBtn.dataset.url;
+    const card = openBtn.closest(".task-card");
+    if (url) {
+      if (url.startsWith("https://t.me/")) tg?.openTelegramLink?.(url);
+      else openInChrome(url);
+    }
+    openBtn.style.display = "none";
+    const verifyEl = card.querySelector(".task-verify-btn");
+    if (verifyEl) verifyEl.style.display = "flex";
+    card.querySelector(".task-proof")?.classList.add("show");
+    const wait = parseInt(card.dataset.wait || "0", 10);
+    if (wait > 0) {
+      // نبلغ السيرفر بلحظة فتح الموقع — هو من يحسب الـ 35 ثانية
+      fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+        body: JSON.stringify({ taskId: card.dataset.taskId }),
+      }).catch(() => {});
+      startCountdown(verifyEl, wait);
+    }
+    return;
   }
 
-  try {
-    const update = req.body;
-    const message = update.message;
+  if (verifyBtn) {
+    const card = verifyBtn.closest(".task-card");
+    const taskId = card?.dataset.taskId;
+    if (!taskId) return;
+    const proofInput = card.querySelector(".task-proof-input");
+    const proof = proofInput ? proofInput.value.trim() : undefined;
+    if (proofInput && proof.length < 2) { showToast("Enter your username first"); return; }
 
-    if (message && message.text) {
-      const chatId = message.chat.id;
-      const text = message.text.trim();
+    verifyBtn.disabled = true;
+    verifyBtn.textContent = "Verifying…";
+    try {
+      const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+        body: JSON.stringify({ taskId, proof }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "verification failed");
 
-      if (text.startsWith("/start")) {
-        const parts = text.split(" ");
-        const payload = parts.length > 1 ? parts[1].trim() : null;
-
-        if (payload) {
-          try {
-            const codeDoc = await db.collection("referralCodes").doc(payload).get();
-            if (codeDoc.exists) {
-              const referrerId = codeDoc.data().userId;
-              if (referrerId !== String(chatId)) {
-                await db.collection("pendingReferrals").doc(String(chatId)).set({
-                  referrerId,
-                  code: payload,
-                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-              }
-            }
-          } catch (e) {
-            console.error("referral payload error", e);
-          }
+      if (data.wait) {
+        showToast(`Please wait ${data.wait}s before verifying`);
+        startCountdown(verifyBtn, data.wait);
+        return;
+      }
+      if (data.notStarted) {
+        showToast("Open the website first");
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "Verify";
+        card.querySelector(".task-open-btn").style.display = "flex";
+        verifyBtn.style.display = "none";
+        return;
+      }
+      if (data.pending) {
+        showToast("Submitted — pending review");
+        verifyBtn.textContent = "Pending review";
+        return;
+      }
+      if (data.verified) {
+        showToast(data.alreadyClaimed ? "Task already completed" : `Task complete! +${data.reward ?? ""} BUX`.trim());
+        if (!data.alreadyClaimed) {
+          playClaimSound();
+          tg?.HapticFeedback?.notificationOccurred("success");
+          state.coins += data.reward || 0;
+          renderBalance();
         }
-
-        const firstName = message.from?.first_name || "there";
-
-        const welcomeCaption =
-          `🏹 <b>Welcome to CrypStore, ${firstName}!</b>\n\n` +
-          `⛏ Earn ${COIN_PER_AD} BUX per ad\n` +
-          `🤝 ${COIN_PER_REFERRAL} BUX per invite\n` +
-          `💸 Convert BUX to GRAM and withdraw anytime`;
-
-        const replyMarkup = {
-          inline_keyboard: [
-            [{ text: "🚀 Start CrypStore", web_app: { url: WEBAPP_URL } }],
-            [{ text: "🌐 Community", url: "https://t.me/CrypStore1" }],
-          ],
-        };
-
-        const cachedFileId = await getStartPhotoFileId();
-        const photoSource = cachedFileId || `${WEBAPP_URL}assets/logo_2.png`;
-
-        const sendResult = await sendTelegramPhoto(chatId, photoSource, welcomeCaption, replyMarkup);
-
-        if (!cachedFileId && sendResult?.photo?.length) {
-          const largest = sendResult.photo[sendResult.photo.length - 1];
-          await saveStartPhotoFileId(largest.file_id);
-        }
+        await loadTasks();
+      } else {
+        showToast("Task not completed yet");
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "Verify";
       }
+    } catch (err) {
+      console.warn(err);
+      showToast("Could not verify right now, try again");
+      verifyBtn.disabled = false;
+      verifyBtn.textContent = "Verify";
     }
-
-    res.sendStatus(200);
-  } catch (e) {
-    console.error("webhook error", e);
-    res.sendStatus(200);
   }
 });
+document.querySelector('.tab[data-view="view-tasks"]').addEventListener("click", loadTasks);
 
-// =========================================================
-// POST /api/referrals/list
-// =========================================================
-app.post("/api/referrals/list", requireTelegramAuth, async (req, res) => {
+/* ========== 11b) Admin ========== */
+async function loadAdminUsers() {
+  const list = document.getElementById("adminUsersList");
+  list.innerHTML = `<div class="empty" id="adminUsersLoading">Loading users…</div>`;
   try {
-    const userId = String(req.tgUser.id);
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) return res.status(404).json({ error: "user not found" });
-    const userData = userDoc.data();
-
-    const snap = await db.collection("referrals").where("referrerId", "==", userId).get();
-    const referrals = [];
-    let unclaimedCount = 0;
-    snap.forEach((d) => {
-      const r = d.data();
-      referrals.push({
-        id: d.id,
-        name: r.refereeName,
-        username: r.refereeUsername,
-        status: r.status,
-        rewardClaimed: r.rewardClaimed,
-      });
-      if (r.status === "active" && !r.rewardClaimed) unclaimedCount++;
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/admin/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
     });
-
-    res.json({
-      ok: true,
-      referralCode: userData.referralCode || null,
-      referralLink: userData.referralCode ? `https://t.me/${BOT_USERNAME}?start=${userData.referralCode}` : null,
-      referralCount: userData.referralCount || 0,
-      referrals,
-      unclaimedReward: +(unclaimedCount * COIN_PER_REFERRAL).toFixed(6),
-      rewardPerReferral: COIN_PER_REFERRAL,
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
-});
-
-// =========================================================
-// POST /api/referrals/claim
-// =========================================================
-app.post("/api/referrals/claim", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const snap = await db
-      .collection("referrals")
-      .where("referrerId", "==", userId)
-      .where("status", "==", "active")
-      .where("rewardClaimed", "==", false)
-      .get();
-
-    if (snap.empty) {
-      return res.json({ ok: true, claimed: 0, amount: 0 });
-    }
-
-    const amount = +(snap.size * COIN_PER_REFERRAL).toFixed(6);
-    const userRef = db.collection("users").doc(userId);
-
-    await db.runTransaction(async (tx) => {
-      const docs = await Promise.all(snap.docs.map((d) => tx.get(d.ref)));
-      docs.forEach((d) => tx.update(d.ref, { rewardClaimed: true }));
-      tx.update(userRef, { coins: admin.firestore.FieldValue.increment(amount) });
-    });
-
-    res.json({ ok: true, claimed: snap.size, amount });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
-});
-
-// =========================================================
-// Tasks — التحقق من الاشتراك في قناة تيليجرام
-// ⚠️ يجب أن يكون البوت عضوًا (يفضّل أدمن) في القناة.
-// =========================================================
-async function isSubscribedToChannel(channelUsername, userId) {
-  const url = `${TELEGRAM_API}/getChatMember?chat_id=@${encodeURIComponent(channelUsername)}&user_id=${userId}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (!data.ok) {
-    console.warn("getChatMember failed:", data.description);
-    return false;
-  }
-  const status = data.result?.status;
-  return ["member", "administrator", "creator"].includes(status);
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "failed to load users");
+    document.getElementById("adminUserCount").textContent = data.count;
+    if (!data.users.length) { list.innerHTML = `<div class="empty">No users yet.</div>`; return; }
+    list.innerHTML = data.users.map((u) => {
+      const displayHandle = u.username ? "@" + u.username : "no username";
+      const initial = (u.firstName || u.username || "U").trim().charAt(0).toUpperCase();
+      const gram = (u.balance || 0).toFixed(3);
+      const bux = Math.floor(u.coins || 0).toLocaleString();
+      return `
+        <div class="admin-user-row">
+          <div class="admin-avatar">${escapeHtml(initial)}</div>
+          <div class="admin-user-info">
+            <div class="admin-user-name">${escapeHtml(u.firstName || "User")}</div>
+            <div class="admin-user-sub">${escapeHtml(displayHandle)} · ${u.referralCount || 0} refs</div>
+          </div>
+          <div class="admin-user-stats">
+            <div class="admin-stat"><span class="val">${bux}</span><span class="lbl">BUX</span></div>
+            <div class="admin-stat"><span class="val">${gram}</span><span class="lbl">GRAM</span></div>
+          </div>
+        </div>`;
+    }).join("");
+  } catch (e) { console.warn(e); list.innerHTML = `<div class="empty">Could not load users.</div>`; }
 }
+document.getElementById("adminTab").addEventListener("click", loadAdminUsers);
 
-// =========================================================
-// POST /api/tasks/list
-// =========================================================
-app.post("/api/tasks/list", requireTelegramAuth, async (req, res) => {
-  try {
-    const userId = String(req.tgUser.id);
-    const userDoc = await db.collection("users").doc(userId).get();
-    const tasksClaimed = (userDoc.exists && userDoc.data().tasksClaimed) || {};
-
-    const tasks = TASKS.map((t) => publicTask(t, tasksClaimed));
-    res.json({ ok: true, tasks });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
+/* ========== 12) TON Connect ========== */
+let tonConnectUI = null;
+let connectedWalletAddress = null;
+function shortenAddress(addr) { return addr ? addr.slice(0, 6) + "…" + addr.slice(-6) : "—"; }
+function renderWalletConnected(wallet) {
+  document.getElementById("walletDisconnected").style.display = "none";
+  document.getElementById("walletConnected").style.display = "flex";
+  document.getElementById("walletAddressShort").textContent = shortenAddress(connectedWalletAddress);
+  document.getElementById("walletAppName").textContent = `Connected via ${wallet?.device?.appName || "your wallet"}`;
+  document.getElementById("connectWalletBtn").style.display = "none";
+  document.getElementById("disconnectWalletBtn").style.display = "flex";
+  document.getElementById("withdrawBtn").disabled = false;
+}
+function renderWalletDisconnected() {
+  document.getElementById("walletDisconnected").style.display = "flex";
+  document.getElementById("walletConnected").style.display = "none";
+  document.getElementById("connectWalletBtn").style.display = "flex";
+  document.getElementById("disconnectWalletBtn").style.display = "none";
+  document.getElementById("withdrawBtn").disabled = true;
+}
+function initTonConnect() {
+  if (!window.TON_CONNECT_UI) { console.warn("TonConnect UI script failed to load"); return; }
+  const manifestUrl = new URL("tonconnect-manifest.json", window.location.href).toString();
+  tonConnectUI = new TON_CONNECT_UI.TonConnectUI({ manifestUrl });
+  tonConnectUI.onStatusChange((wallet) => {
+    if (wallet) {
+      connectedWalletAddress = TON_CONNECT_UI.toUserFriendlyAddress(wallet.account.address);
+      renderWalletConnected(wallet);
+    } else { connectedWalletAddress = null; renderWalletDisconnected(); }
+  });
+}
+document.getElementById("connectWalletBtn").addEventListener("click", () => {
+  if (!tonConnectUI) { showToast("Wallet connect is unavailable right now"); return; }
+  tonConnectUI.openModal();
+});
+document.getElementById("disconnectWalletBtn").addEventListener("click", async () => {
+  if (!tonConnectUI) return;
+  await tonConnectUI.disconnect();
+  showToast("Wallet disconnected");
 });
 
-// =========================================================
-// POST /api/tasks/start
-// تسجّل لحظة فتح المستخدم لمهمة موقع (الساعة هنا ساعة السيرفر،
-// فلا يمكن التلاعب بها من الواجهة). تُسجَّل أول مرة فقط.
-// body: { taskId }
-// =========================================================
-app.post("/api/tasks/start", requireTelegramAuth, async (req, res) => {
+/* ========== 12b) Convert ========== */
+document.getElementById("convertBtn").addEventListener("click", async () => {
+  const amount = Math.floor(parseFloat(document.getElementById("convertAmount").value));
+  if (!amount || amount <= 0) { showToast("Enter a valid BUX amount"); return; }
+  if (amount > state.coins) { showToast("Insufficient BUX balance"); return; }
   try {
-    const userId = String(req.tgUser.id);
-    const task = TASKS.find((t) => t.id === req.body.taskId);
-    if (!task || !task.minSeconds) return res.status(404).json({ error: "task not found" });
-
-    const userRef = db.collection("users").doc(userId);
-    await db.runTransaction(async (tx) => {
-      const doc = await tx.get(userRef);
-      if (!doc.exists) throw new Error("user not found");
-      const started = (doc.data().tasksStarted || {})[task.id];
-      if (!started) tx.update(userRef, { [`tasksStarted.${task.id}`]: Date.now() });
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/convert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({ amount }),
     });
-
-    res.json({ ok: true, wait: task.minSeconds });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "conversion failed");
+    state.coins -= data.converted;
+    state.balance += data.gram;
+    renderBalance();
+    document.getElementById("convertAmount").value = "";
+    showToast(`Converted ${data.converted} BUX → ${data.gram.toFixed(4)} GRAM`);
+    playClaimSound();
+    tg?.HapticFeedback?.notificationOccurred("success");
+  } catch (e) { console.warn(e); showToast("Could not convert right now"); }
 });
 
-// =========================================================
-// POST /api/tasks/verify
-// يتحقق من إنجاز مهمة ويمنح المكافأة مرة واحدة فقط لكل مستخدم
-// body: { taskId, proof? }
-// =========================================================
-app.post("/api/tasks/verify", requireTelegramAuth, async (req, res) => {
+/* ========== 13) Withdraw ========== */
+document.getElementById("withdrawBtn").addEventListener("click", async () => {
+  const wallet = connectedWalletAddress;
+  const amount = parseFloat(document.getElementById("withdrawAmount").value);
+  if (!wallet) { showToast("Connect your wallet first"); return; }
+  if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`Minimum withdrawal is ${CONFIG.MIN_WITHDRAW} GRAM`); return; }
+  if (amount > state.balance) { showToast("Insufficient balance"); return; }
   try {
-    const userId = String(req.tgUser.id);
-    const { taskId, proof } = req.body;
-    const task = TASKS.find((t) => t.id === taskId);
-    if (!task) return res.status(404).json({ error: "task not found" });
-
-    const userRef = db.collection("users").doc(userId);
-    const userDoc = await userRef.get();
-    if (!userDoc.exists) return res.status(404).json({ error: "user not found" });
-
-    const userData = userDoc.data();
-    const tasksClaimed = userData.tasksClaimed || {};
-    if (tasksClaimed[task.id]) {
-      return res.json({ ok: true, verified: true, alreadyClaimed: true });
-    }
-
-    let verified = false;
-    if (task.type === "telegram_channel") {
-      verified = await isSubscribedToChannel(task.channelUsername, userId);
-    } else if (task.type === "website") {
-      const startedAt = (userData.tasksStarted || {})[task.id];
-      if (!startedAt) {
-        return res.json({ ok: true, verified: false, notStarted: true });
-      }
-      const elapsed = (Date.now() - startedAt) / 1000;
-      if (elapsed < task.minSeconds) {
-        return res.json({ ok: true, verified: false, wait: Math.ceil(task.minSeconds - elapsed) });
-      }
-      verified = true;
-
-      // اختياري: حفظ اسم المستخدم المُدخل (إن وُجد) لمراجعته لاحقًا
-      if (typeof proof === "string" && proof.trim()) {
-        await db.collection("taskSubmissions").add({
-          userId,
-          taskId: task.id,
-          proof: proof.trim().slice(0, 100),
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    if (!verified) {
-      return res.json({ ok: true, verified: false });
-    }
-
-    await db.runTransaction(async (tx) => {
-      const fresh = await tx.get(userRef);
-      const freshClaimed = fresh.data().tasksClaimed || {};
-      if (freshClaimed[task.id]) return; // مُطالَب بها بالفعل من طلب متزامن
-      tx.update(userRef, {
-        coins: admin.firestore.FieldValue.increment(task.reward),
-        [`tasksClaimed.${task.id}`]: true,
-      });
+    const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/withdraw/request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+      body: JSON.stringify({ wallet, amount }),
     });
-
-    res.json({ ok: true, verified: true, reward: task.reward });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
+    if (!res.ok) throw new Error("withdraw request failed");
+    showToast("Withdrawal request sent for review");
+  } catch (e) { console.warn(e); showToast("Could not send request, try again later"); }
 });
 
-// =========================================================
-// POST /api/admin/users — للأدمن فقط
-// =========================================================
-app.post("/api/admin/users", requireTelegramAuth, requireAdmin, async (req, res) => {
-  try {
-    const snap = await db.collection("users").orderBy("createdAt", "desc").get();
-    const users = [];
-    snap.forEach((d) => {
-      const u = d.data();
-      users.push({
-        id: d.id,
-        firstName: u.firstName || "",
-        username: u.username || "",
-        referralCount: u.referralCount || 0,
-        coins: +(u.coins || 0).toFixed(2),     // BUX
-        balance: +(u.balance || 0).toFixed(4), // GRAM
-      });
-    });
+/* ========== 14) Disable copy / context menu ========== */
+function isEditableTarget(el) { return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA"); }
+["contextmenu", "selectstart", "copy", "cut", "dragstart"].forEach(ev =>
+  document.addEventListener(ev, (e) => { if (!isEditableTarget(e.target)) e.preventDefault(); })
+);
 
-    res.json({ ok: true, count: users.length, users });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "internal error" });
-  }
+/* ========== 15) Entry point ========== */
+window.addEventListener("DOMContentLoaded", async () => {
+  await runSplashSequence();
+  initAds();
+  initTonConnect();
+  renderBalance();
 });
-
-// ---------- health check ----------
-app.get("/", (req, res) => res.send("CrypStore backend is running."));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+</script>
+</body>
+</html>

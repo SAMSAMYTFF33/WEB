@@ -9,309 +9,188 @@
 <meta property="og:title" content="CrypStore 🏹">
 <meta property="og:description" content="Earn BUX by watching ads">
 <meta property="og:image" content="assets/logo_512.png">
-<!-- Telegram WebApp SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<!-- Monetag SDK (zone 11575327 — CrypStorebot) -->
 <script src='//libtl.com/sdk.js' data-zone='11575327' data-sdk='show_11575327'></script>
-<!-- TON Connect UI (wallet connection for withdrawals) -->
 <script src="https://unpkg.com/@tonconnect/ui@2/dist/tonconnect-ui.min.js"></script>
-<!-- Firebase (compat build) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* ===== Palette — graphite / brushed brass / steel blue ===== */
-  --bg:#0a0d12;
-  --bg-grad:#0d1117;
-  --surface:#12161d;
-  --surface-2:#171c25;
-  --surface-3:#1c222c;
-  --border:rgba(255,255,255,.055);
-  --border-strong:rgba(255,255,255,.11);
-  --text:#eef1f5;
-  --text-dim:#a7b0bd;
-  --text-muted:#647085;
-  --accent:#4a94c9;
-  --accent-dim:#2c5877;
-  --brass:#c6a25c;
-  --brass-2:#e2c583;
-  --success:#4e9d78;
-  --success-bg:rgba(78,157,120,.12);
-  --danger:#c96a5f;
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bg:#0a0d12; --surface:#12161d; --surface-2:#171c25; --surface-3:#1c222c;
+  --border:rgba(255,255,255,.055); --border-strong:rgba(255,255,255,.11);
+  --text:#eef1f5; --text-dim:#a7b0bd; --text-muted:#647085;
+  --accent:#4a94c9; --accent-dim:#2c5877; --brass:#c6a25c; --brass-2:#e2c583;
+  --success:#4e9d78; --success-bg:rgba(78,157,120,.12); --danger:#c96a5f;
+  --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
-/* ===== Disable text selection / copy / long-press menu across the app ===== */
-*{
-  -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; user-select:none;
-  -webkit-touch-callout:none;
-}
-input, textarea{
-  -webkit-user-select:text; -moz-user-select:text; -ms-user-select:text; user-select:text;
-  -webkit-touch-callout:default;
-}
-html,body{ height:100%; background:var(--bg); color:var(--text); font-family:'Tajawal', -apple-system, system-ui, sans-serif; overscroll-behavior:none; }
-body{
-  display:flex; flex-direction:column; min-height:100vh;
-  font-variant-numeric: tabular-nums;
-  background:
-    radial-gradient(900px 500px at 50% -10%, rgba(74,148,201,.08), transparent 60%),
-    var(--bg);
-}
-::-webkit-scrollbar{ display:none; }
-.mono{ font-family:'IBM Plex Mono', monospace; }
+*{-webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; user-select:none; -webkit-touch-callout:none;}
+input, textarea{-webkit-user-select:text; -moz-user-select:text; -ms-user-select:text; user-select:text; -webkit-touch-callout:default;}
+html,body{height:100%; background:var(--bg); color:var(--text); font-family:'Tajawal', -apple-system, system-ui, sans-serif; overscroll-behavior:none;}
+body{display:flex; flex-direction:column; min-height:100vh; font-variant-numeric:tabular-nums;
+  background: radial-gradient(900px 500px at 50% -10%, rgba(74,148,201,.08), transparent 60%), var(--bg);}
+::-webkit-scrollbar{display:none;}
+.mono{font-family:'IBM Plex Mono', monospace;}
 
-/* ===== Splash ===== */
-#splash{
-  position:fixed; inset:0; z-index:100;
-  background: radial-gradient(circle at 50% 28%, #101722, var(--bg) 72%);
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
-  transition: opacity .4s ease, visibility .4s ease;
-}
-#splash.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+/* Splash */
+#splash{position:fixed; inset:0; z-index:100; background:radial-gradient(circle at 50% 28%, #101722, var(--bg) 72%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; transition:opacity .4s ease, visibility .4s ease;}
+#splash.hidden{opacity:0; visibility:hidden; pointer-events:none;}
+.splash-mark{width:80px; height:80px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-2); border:2px solid transparent;
+  background-image:linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
+  background-origin:border-box; background-clip:content-box, border-box;
+  box-shadow:0 0 0 1px var(--border-strong), 0 8px 24px rgba(0,0,0,.35);}
+.splash-mark img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;}
+.splash-title{font-weight:800; font-size:15px; letter-spacing:4px; color:var(--text-dim); text-transform:uppercase;}
+.splash-bar-track{width:160px; height:2px; border-radius:99px; background:var(--surface-2); overflow:hidden;}
+.splash-bar-fill{height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--brass)); transition:width .3s ease;}
+.splash-status{font-size:11.5px; color:var(--text-muted); min-height:16px; letter-spacing:.2px;}
 
-/* Logo — circular frame */
-.splash-mark{
-  width:80px; height:80px; border-radius:50%;
-  overflow:hidden; display:flex; align-items:center; justify-content:center;
-  background: var(--surface-2);
-  border:2px solid transparent;
-  background-image: linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
-  background-origin: border-box;
-  background-clip: content-box, border-box;
-  box-shadow: 0 0 0 1px var(--border-strong), 0 8px 24px rgba(0,0,0,.35);
-}
-.splash-mark img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+/* Header */
+header{padding:calc(16px + var(--safe-top)) 18px 16px; background:linear-gradient(180deg, #0c1016 0%, var(--bg) 100%);
+  border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10;}
+.header-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;}
+.brand{display:flex; align-items:center; gap:9px;}
+.brand-mark{width:30px; height:30px; border-radius:50%; overflow:hidden; flex-shrink:0; background:var(--surface-2);
+  border:1.5px solid transparent; background-image:linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
+  background-origin:border-box; background-clip:content-box, border-box;}
+.brand-mark img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;}
+.brand span{font-weight:800; font-size:14.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text);}
+.avatar{width:32px; height:32px; border-radius:9px; background:var(--surface-2); border:1px solid var(--border-strong);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--text-dim);}
+.balance-card{position:relative; overflow:hidden; background:linear-gradient(160deg, var(--surface-2), var(--surface));
+  border:1px solid var(--border); border-radius:14px; padding:11px 14px; display:flex; align-items:center; gap:12px;}
+.balance-card::before{content:""; position:absolute; inset-inline-end:-30px; top:-30px; width:100px; height:100px; border-radius:50%;
+  background:radial-gradient(circle, rgba(198,162,92,.09), transparent 70%);}
+.balance-mid{flex:1; min-width:0; position:relative; z-index:1;}
+.balance-label{font-size:10px; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase;}
+.balance-value{font-size:19px; font-weight:800; display:flex; align-items:baseline; gap:6px; letter-spacing:-.2px; margin-top:1px;}
+.balance-value .unit{font-size:11px; color:var(--brass); font-weight:700; letter-spacing:.4px;}
+.balance-usd{font-size:10.5px; color:var(--text-muted); position:relative; z-index:1; flex-shrink:0;}
+.coin-icon{width:34px; height:34px; position:relative; z-index:1; border-radius:50%; overflow:hidden; flex-shrink:0; background:var(--surface-2);
+  border:1.5px solid transparent; background-image:linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--brass), var(--brass-2));
+  background-origin:border-box; background-clip:content-box, border-box;}
+.coin-icon img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;}
 
-.splash-title{ font-weight:800; font-size:15px; letter-spacing:4px; color:var(--text-dim); text-transform:uppercase; }
-.splash-bar-track{ width:160px; height:2px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
-.splash-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--brass)); transition:width .3s ease; }
-.splash-status{ font-size:11.5px; color:var(--text-muted); min-height:16px; letter-spacing:.2px; }
+main{flex:1; padding:20px 18px calc(100px + var(--safe-bottom));}
+.view{display:none; animation:fadein .3s ease;}
+.view.active{display:block;}
+@keyframes fadein{from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);}}
+.section-title{font-size:11.5px; font-weight:800; color:var(--text-muted); margin:26px 0 12px; letter-spacing:1px; text-transform:uppercase; display:flex; align-items:center; gap:8px;}
+.section-title::after{content:""; flex:1; height:1px; background:var(--border);}
+.section-title:first-child{margin-top:0;}
 
-/* ===== Header ===== */
-header{
-  padding: calc(16px + var(--safe-top)) 18px 16px;
-  background: linear-gradient(180deg, #0c1016 0%, var(--bg) 100%);
-  border-bottom: 1px solid var(--border);
-  position: sticky; top:0; z-index:10;
-}
-.header-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-.brand{ display:flex; align-items:center; gap:9px; }
+/* Dial */
+.dial-wrap{display:flex; flex-direction:column; align-items:center; padding:10px 0 4px;}
+.dial{position:relative; width:184px; height:184px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; border:none; background:none;}
+.dial-ring{position:absolute; inset:0; border-radius:50%; background:conic-gradient(var(--brass) calc(var(--progress, 0) * 1%), rgba(255,255,255,.06) 0);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px)); transition:background .8s ease;}
+.dial-core{position:relative; width:154px; height:154px; border-radius:50%; background:linear-gradient(160deg, var(--surface-2), #0e1218 75%);
+  border:1px solid var(--border-strong); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03); transition:transform .12s ease;}
+.dial:active .dial-core{transform:scale(.97);}
+.dial-core .play-icon{width:26px; height:26px; color:var(--brass);}
+.dial-core .cta{font-size:12.5px; font-weight:700; letter-spacing:.2px; color:var(--text);}
+.dial-core .sub{font-size:11px; color:var(--text-muted);}
+.dial-core .sub b{color:var(--brass-2); font-weight:700;}
+.dial-progress-label{margin-top:16px; font-size:12px; color:var(--text-muted); letter-spacing:.2px;}
+.burst{position:absolute; inset:0; pointer-events:none;}
+.spark{position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%; background:var(--brass-2); opacity:0;}
 
-/* Header logo — circular frame */
-.brand-mark{
-  width:30px; height:30px; border-radius:50%;
-  overflow:hidden; flex-shrink:0;
-  background: var(--surface-2);
-  border:1.5px solid transparent;
-  background-image: linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--accent), var(--brass));
-  background-origin: border-box;
-  background-clip: content-box, border-box;
-}
-.brand-mark img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+.card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:11px;}
+.row{display:flex; align-items:center; justify-content:space-between;}
+.row + .row{margin-top:11px; padding-top:11px; border-top:1px solid var(--border);}
+.row .k{font-size:12.5px; color:var(--text-muted);}
+.row .v{font-size:13.5px; font-weight:700; letter-spacing:.1px;}
+.btn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; border-radius:12px; border:1px solid transparent;
+  font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); letter-spacing:.1px; transition:filter .15s ease, transform .1s ease;}
+.btn svg{width:16px; height:16px; flex-shrink:0;}
+.btn:active{transform:scale(.99);}
+.btn-primary{background:var(--accent); color:#08131c;}
+.btn-primary:active{filter:brightness(.94);}
+.btn-ton{background:var(--brass); color:#1a1206;}
+.btn-ton:active{filter:brightness(.94);}
+.btn-ghost{background:var(--surface-2); color:var(--text-dim); border:1px solid var(--border-strong);}
+.btn[disabled]{opacity:.4; pointer-events:none;}
+.input{width:100%; padding:13px 14px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); font-family:inherit; font-size:13.5px; margin-bottom:10px;}
+.input::placeholder{color:var(--text-muted);}
+.input:focus{outline:none; border-color:var(--accent-dim);}
+.hint{font-size:11.5px; color:var(--text-muted); line-height:1.75; margin-top:8px; padding-inline-start:12px; border-inline-start:2px solid var(--border-strong);}
+.hint.warn{border-inline-start-color:var(--brass); color:#b7ac93;}
 
-.brand span{ font-weight:800; font-size:14.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text); }
-.avatar{
-  width:32px; height:32px; border-radius:9px;
-  background: var(--surface-2); border:1px solid var(--border-strong);
-  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--text-dim);
-}
-.balance-card{
-  position:relative; overflow:hidden;
-  background: linear-gradient(160deg, var(--surface-2), var(--surface));
-  border:1px solid var(--border); border-radius:14px; padding:11px 14px;
-  display:flex; align-items:center; gap:12px;
-}
-.balance-card::before{
-  content:""; position:absolute; inset-inline-end:-30px; top:-30px; width:100px; height:100px; border-radius:50%;
-  background: radial-gradient(circle, rgba(198,162,92,.09), transparent 70%);
-}
-.balance-mid{ flex:1; min-width:0; position:relative; z-index:1; }
-.balance-label{ font-size:10px; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase; }
-.balance-value{ font-size:19px; font-weight:800; display:flex; align-items:baseline; gap:6px; letter-spacing:-.2px; margin-top:1px; }
-.balance-value .unit{ font-size:11px; color:var(--brass); font-weight:700; letter-spacing:.4px; }
-.balance-usd{ font-size:10.5px; color:var(--text-muted); position:relative; z-index:1; flex-shrink:0; }
-.coin-icon{
-  width:34px; height:34px; position:relative; z-index:1;
-  border-radius:50%; overflow:hidden; flex-shrink:0;
-  background: var(--surface-2);
-  border:1.5px solid transparent;
-  background-image: linear-gradient(var(--surface-2), var(--surface-2)), linear-gradient(135deg, var(--brass), var(--brass-2));
-  background-origin: border-box;
-  background-clip: content-box, border-box;
-}
-.coin-icon img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+/* Wallet */
+.wallet-card{display:flex; flex-direction:column; gap:14px;}
+.wallet-row{display:flex; align-items:center; gap:12px;}
+.wallet-icon{width:40px; height:40px; border-radius:12px; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; color:var(--text-muted);}
+.wallet-icon svg{width:19px; height:19px;}
+.wallet-icon.connected{background:var(--success-bg); border-color:rgba(78,157,120,.3); color:#8fd0ac;}
+.wallet-copy{flex:1; min-width:0;}
+.wallet-title{font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.wallet-title.mono{letter-spacing:.2px;}
+.wallet-sub{font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5;}
+.ref-link{display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:10px; padding:13px 14px; font-size:12px; color:var(--text-dim); direction:ltr; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.empty{text-align:center; padding:28px 10px; color:var(--text-muted); font-size:12.5px; line-height:1.7;}
 
-main{ flex:1; padding: 20px 18px calc(100px + var(--safe-bottom)); }
-.view{ display:none; animation: fadein .3s ease; }
-.view.active{ display:block; }
-@keyframes fadein{ from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);} }
+/* Tasks */
+.task-card{position:relative; overflow:hidden; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px 18px; margin-bottom:12px;}
+.task-card::before{content:""; position:absolute; inset-inline-start:0; top:0; bottom:0; width:3px; background:linear-gradient(180deg, var(--accent), var(--accent-dim));}
+.task-card.website::before{background:linear-gradient(180deg, var(--brass-2), var(--brass));}
+.task-card.completed{border-color:rgba(78,157,120,.25); background:linear-gradient(160deg, #131b17, var(--surface));}
+.task-card.completed::before{background:var(--success);}
+.task-row{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+.task-icon{width:44px; height:44px; border-radius:13px; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-size:20px;}
+.task-copy{flex:1; min-width:0;}
+.task-title{font-size:13.5px; font-weight:700; color:var(--text);}
+.task-sub{font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5;}
+.task-tag{display:inline-flex; align-items:center; gap:5px; margin-top:7px; font-size:10px; font-weight:700; letter-spacing:.3px; padding:3px 8px; border-radius:6px; background:rgba(198,162,92,.12); color:var(--brass-2);}
+.task-tag svg{width:11px; height:11px;}
+.task-reward{flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:1px; font-family:'IBM Plex Mono', monospace; font-weight:700; font-size:13px; color:var(--brass-2);}
+.task-reward span{font-size:9.5px; font-weight:700; letter-spacing:.3px; color:var(--text-muted); font-family:'Tajawal', sans-serif; text-transform:uppercase;}
+.task-actions{display:flex; gap:8px;}
+.task-actions .btn{flex:1;}
+.task-proof{margin-top:10px; display:none;}
+.task-proof.show{display:block;}
+.task-proof .input{margin-bottom:8px;}
+.task-done{display:flex; align-items:center; justify-content:center; gap:7px; color:#8fd0ac; font-size:12.5px; font-weight:700; padding:12px; background:var(--success-bg); border-radius:10px;}
+.task-done svg{width:15px; height:15px;}
+.friend-row{display:flex; align-items:center; justify-content:space-between; padding:11px 0;}
+.friend-row + .friend-row{border-top:1px solid var(--border);}
+.friend-name{font-size:12.5px; font-weight:700; color:var(--text);}
+.friend-status{font-size:11px; font-weight:700; padding:4px 9px; border-radius:7px; letter-spacing:.2px;}
+.friend-status.active{background:var(--success-bg); color:#8fd0ac;}
+.friend-status.claimed{background:var(--surface-2); color:var(--text-muted);}
+.friend-status.pending{background:rgba(198,162,92,.12); color:var(--brass-2);}
 
-.section-title{
-  font-size:11.5px; font-weight:800; color:var(--text-muted); margin: 26px 0 12px;
-  letter-spacing:1px; text-transform:uppercase; display:flex; align-items:center; gap:8px;
-}
-.section-title::after{ content:""; flex:1; height:1px; background:var(--border); }
-.section-title:first-child{ margin-top:0; }
+nav{position:fixed; bottom:0; left:0; right:0; background:rgba(10,13,18,.94); backdrop-filter:blur(16px); border-top:1px solid var(--border); padding:9px 12px calc(9px + var(--safe-bottom)); display:flex; gap:2px; z-index:20;}
+.tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none; color:var(--text-muted); font-family:inherit; padding:7px 2px 9px; border-radius:10px; cursor:pointer; position:relative;}
+.tab svg{width:20px; height:20px;}
+.tab span{font-size:10px; font-weight:700; letter-spacing:.2px;}
+.tab.active{color:var(--text);}
+.tab.active::after{content:""; position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:16px; height:2px; border-radius:2px; background:var(--brass);}
+.toast{position:fixed; top:calc(12px + var(--safe-top)); left:50%; transform:translateX(-50%) translateY(-140%); background:var(--surface-3); border:1px solid var(--border-strong); color:var(--text); padding:11px 18px; border-radius:10px; font-size:12.5px; font-weight:700; z-index:50; transition:transform .3s cubic-bezier(.2,.8,.2,1); box-shadow:0 10px 30px rgba(0,0,0,.4); white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
 
-/* ===== Ad dial ===== */
-.dial-wrap{ display:flex; flex-direction:column; align-items:center; padding: 10px 0 4px; }
-.dial{ position:relative; width:184px; height:184px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; border:none; background:none; }
-.dial-ring{
-  position:absolute; inset:0; border-radius:50%;
-  background: conic-gradient(var(--brass) calc(var(--progress, 0) * 1%), rgba(255,255,255,.06) 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-  transition: background .8s ease;
-}
-.dial-core{
-  position:relative; width:154px; height:154px; border-radius:50%;
-  background: linear-gradient(160deg, var(--surface-2), #0e1218 75%);
-  border:1px solid var(--border-strong);
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
-  transition: transform .12s ease;
-}
-.dial:active .dial-core{ transform: scale(.97); }
-.dial-core .play-icon{ width:26px; height:26px; color:var(--brass); }
-.dial-core .cta{ font-size:12.5px; font-weight:700; letter-spacing:.2px; color:var(--text); }
-.dial-core .sub{ font-size:11px; color:var(--text-muted); }
-.dial-core .sub b{ color:var(--brass-2); font-weight:700; }
-.dial-progress-label{ margin-top:16px; font-size:12px; color:var(--text-muted); letter-spacing:.2px; }
-.burst{ position:absolute; inset:0; pointer-events:none; }
-.spark{ position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%; background: var(--brass-2); opacity:0; }
-
-.card{ background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:11px; }
-.row{ display:flex; align-items:center; justify-content:space-between; }
-.row + .row{ margin-top:11px; padding-top:11px; border-top:1px solid var(--border); }
-.row .k{ font-size:12.5px; color:var(--text-muted); }
-.row .v{ font-size:13.5px; font-weight:700; letter-spacing:.1px; }
-.btn{
-  display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px;
-  border-radius:12px; border:1px solid transparent; font-family:inherit; font-size:13.5px; font-weight:700;
-  cursor:pointer; color:var(--text); letter-spacing:.1px; transition: filter .15s ease, transform .1s ease;
-}
-.btn:active{ transform: scale(.99); }
-.btn-primary{ background: var(--accent); color:#08131c; }
-.btn-primary:active{ filter:brightness(.94); }
-.btn-ton{ background: var(--brass); color:#1a1206; }
-.btn-ton:active{ filter:brightness(.94); }
-.btn-ghost{ background: var(--surface-2); color:var(--text-dim); border:1px solid var(--border-strong); }
-.btn[disabled]{ opacity:.4; pointer-events:none; }
-.input{
-  width:100%; padding:13px 14px; border-radius:10px; background: var(--surface-2);
-  border:1px solid var(--border-strong); color:var(--text); font-family:inherit; font-size:13.5px; margin-bottom:10px;
-}
-.input::placeholder{ color:var(--text-muted); }
-.input:focus{ outline:none; border-color:var(--accent-dim); }
-.hint{ font-size:11.5px; color:var(--text-muted); line-height:1.75; margin-top:8px; padding-inline-start:12px; border-inline-start:2px solid var(--border-strong); }
-.hint.warn{ border-inline-start-color: var(--brass); color:#b7ac93; }
-
-/* ===== Wallet connect card (TON Connect) ===== */
-.wallet-card{ display:flex; flex-direction:column; gap:14px; }
-.wallet-row{ display:flex; align-items:center; gap:12px; }
-.wallet-icon{
-  width:40px; height:40px; border-radius:12px; flex-shrink:0;
-  background:var(--surface-2); border:1px solid var(--border-strong);
-  display:flex; align-items:center; justify-content:center; color:var(--text-muted);
-}
-.wallet-icon svg{ width:19px; height:19px; }
-.wallet-icon.connected{ background:var(--success-bg); border-color:rgba(78,157,120,.3); color:#8fd0ac; }
-.wallet-copy{ flex:1; min-width:0; }
-.wallet-title{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.wallet-title.mono{ letter-spacing:.2px; }
-.wallet-sub{ font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5; }
-.ref-link{
-  display:flex; align-items:center; gap:8px; background: var(--surface-2); border:1px solid var(--border-strong);
-  border-radius:10px; padding:13px 14px; font-size:12px; color:var(--text-dim); direction:ltr; text-align:left;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-.empty{ text-align:center; padding:28px 10px; color:var(--text-muted); font-size:12.5px; line-height:1.7; }
-
-/* ===== Tasks ===== */
-.task-card{ background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:11px; }
-.task-card.completed{ border-color: rgba(78,157,120,.25); background: linear-gradient(160deg, #131b17, var(--surface)); }
-.task-row{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
-.task-icon{
-  width:42px; height:42px; border-radius:12px; flex-shrink:0;
-  background: var(--surface-2); border:1px solid var(--border-strong);
-  display:flex; align-items:center; justify-content:center; font-size:19px;
-}
-.task-copy{ flex:1; min-width:0; }
-.task-title{ font-size:13.5px; font-weight:700; color:var(--text); }
-.task-sub{ font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5; }
-.task-reward{
-  flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:1px;
-  font-family:'IBM Plex Mono', monospace; font-weight:700; font-size:13px; color:var(--brass-2);
-}
-.task-reward span{ font-size:9.5px; font-weight:700; letter-spacing:.3px; color:var(--text-muted); font-family:'Tajawal', sans-serif; text-transform:uppercase; }
-.task-actions{ display:flex; gap:8px; }
-.task-actions .btn{ flex:1; }
-.task-done{
-  display:flex; align-items:center; justify-content:center; gap:7px;
-  color:#8fd0ac; font-size:12.5px; font-weight:700; padding:12px; background: var(--success-bg); border-radius:10px;
-}
-.task-done svg{ width:15px; height:15px; }
-.friend-row{
-  display:flex; align-items:center; justify-content:space-between; padding:11px 0;
-}
-.friend-row + .friend-row{ border-top:1px solid var(--border); }
-.friend-name{ font-size:12.5px; font-weight:700; color:var(--text); }
-.friend-status{ font-size:11px; font-weight:700; padding:4px 9px; border-radius:7px; letter-spacing:.2px; }
-.friend-status.active{ background: var(--success-bg); color:#8fd0ac; }
-.friend-status.claimed{ background: var(--surface-2); color:var(--text-muted); }
-.friend-status.pending{ background: rgba(198,162,92,.12); color:var(--brass-2); }
-nav{
-  position:fixed; bottom:0; left:0; right:0; background: rgba(10,13,18,.94); backdrop-filter: blur(16px);
-  border-top:1px solid var(--border); padding: 9px 12px calc(9px + var(--safe-bottom)); display:flex; gap:2px; z-index:20;
-}
-.tab{
-  flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none;
-  color:var(--text-muted); font-family:inherit; padding:7px 2px 9px; border-radius:10px; cursor:pointer; position:relative;
-}
-.tab svg{ width:20px; height:20px; }
-.tab span{ font-size:10px; font-weight:700; letter-spacing:.2px; }
-.tab.active{ color:var(--text); }
-.tab.active::after{
-  content:""; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
-  width:16px; height:2px; border-radius:2px; background:var(--brass);
-}
-.toast{
-  position:fixed; top: calc(12px + var(--safe-top)); left:50%; transform:translateX(-50%) translateY(-140%);
-  background:var(--surface-3); border:1px solid var(--border-strong); color:var(--text); padding:11px 18px;
-  border-radius:10px; font-size:12.5px; font-weight:700; z-index:50; transition: transform .3s cubic-bezier(.2,.8,.2,1);
-  box-shadow:0 10px 30px rgba(0,0,0,.4); white-space:nowrap;
-}
-.toast.show{ transform:translateX(-50%) translateY(0); }
-
-/* ===== Admin — all users panel (visible only to the admin account) ===== */
-.admin-user-row{ display:flex; align-items:center; gap:11px; padding:11px 0; }
-.admin-user-row + .admin-user-row{ border-top:1px solid var(--border); }
-.admin-avatar{
-  width:36px; height:36px; border-radius:50%; flex-shrink:0;
-  background: var(--surface-2); border:1px solid var(--border-strong);
-  display:flex; align-items:center; justify-content:center;
-  font-weight:700; font-size:12.5px; color:var(--text-dim);
-}
-.admin-user-info{ flex:1; min-width:0; }
-.admin-user-name{ font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.admin-user-sub{ font-size:10.5px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.admin-user-stats{ display:flex; gap:12px; flex-shrink:0; }
-.admin-stat{ display:flex; flex-direction:column; align-items:flex-end; }
-.admin-stat .val{ font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:700; color:var(--brass-2); }
-.admin-stat .lbl{ font-size:8.5px; font-weight:700; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase; margin-top:1px; }
+/* Admin */
+.admin-user-row{display:flex; align-items:center; gap:11px; padding:11px 0;}
+.admin-user-row + .admin-user-row{border-top:1px solid var(--border);}
+.admin-avatar{width:36px; height:36px; border-radius:50%; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--text-dim);}
+.admin-user-info{flex:1; min-width:0;}
+.admin-user-name{font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.admin-user-sub{font-size:10.5px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.admin-user-stats{display:flex; gap:12px; flex-shrink:0;}
+.admin-stat{display:flex; flex-direction:column; align-items:flex-end;}
+.admin-stat .val{font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:700; color:var(--brass-2);}
+.admin-stat .lbl{font-size:8.5px; font-weight:700; color:var(--text-muted); letter-spacing:.3px; text-transform:uppercase; margin-top:1px;}
 </style>
 </head>
 <body>
 
-<!-- ===================== Splash / Loading ===================== -->
 <div id="splash">
-  <div class="splash-mark">
-    <img src="assets/logo_1.png" alt="CrypStore logo">
-  </div>
+  <div class="splash-mark"><img src="assets/logo_1.png" alt="CrypStore logo"></div>
   <div class="splash-title">CrypStore 🏹</div>
   <div class="splash-bar-track"><div class="splash-bar-fill" id="splashBarFill"></div></div>
   <div class="splash-status" id="splashStatus">Preparing…</div>
@@ -320,18 +199,13 @@ nav{
 <header>
   <div class="header-row">
     <div class="brand">
-      <div class="brand-mark">
-        <img id="brandLogoImg" src="assets/logo_1.png" alt="User avatar">
-      </div>
+      <div class="brand-mark"><img id="brandLogoImg" src="assets/logo_1.png" alt="User avatar"></div>
       <span id="brandName">CrypStore 🏹</span>
     </div>
     <div class="avatar" id="avatarInitial">?</div>
   </div>
-
   <div class="balance-card">
-    <div class="coin-icon">
-      <img src="assets/logo_1.png" alt="BUX coin">
-    </div>
+    <div class="coin-icon"><img src="assets/logo_1.png" alt="BUX coin"></div>
     <div class="balance-mid">
       <div class="balance-label">Current Balance</div>
       <div class="balance-value mono"><span id="balanceValue">0</span><span class="unit">BUX</span></div>
@@ -341,7 +215,6 @@ nav{
 </header>
 
 <main>
-  <!-- ===== Home / Watch Ads ===== -->
   <section class="view active" id="view-home">
     <div class="dial-wrap">
       <button class="dial" id="orbBtn">
@@ -355,7 +228,6 @@ nav{
       </button>
       <div class="dial-progress-label" id="progressLabel">0 / 20 views today</div>
     </div>
-
     <div class="section-title">Your Stats</div>
     <div class="card">
       <div class="row"><span class="k">Today's Earnings</span><span class="v mono" id="statToday">0 BUX</span></div>
@@ -365,16 +237,12 @@ nav{
     <div class="hint">The daily view limit resets every 24 hours. Rewards are only credited after the server confirms the ad view was completed.</div>
   </section>
 
-  <!-- ===== Tasks ===== -->
   <section class="view" id="view-tasks">
     <div class="section-title">Tasks</div>
-    <div id="tasksList">
-      <div class="empty" id="tasksLoading">Loading tasks…</div>
-    </div>
-    <div class="hint">Complete tasks to earn extra BUX. New tasks are added regularly — check back often.</div>
+    <div id="tasksList"><div class="empty" id="tasksLoading">Loading tasks…</div></div>
+    <div class="hint">Complete tasks to earn extra BUX. Website tasks open in Google Chrome outside Telegram. New tasks are added regularly — check back often.</div>
   </section>
 
-  <!-- ===== Referrals ===== -->
   <section class="view" id="view-ref">
     <div class="section-title">Invite Friends</div>
     <div class="card">
@@ -382,22 +250,17 @@ nav{
       <div class="row"><span class="k">Unclaimed rewards</span><span class="v mono" id="refUnclaimed">0 BUX</span></div>
     </div>
     <button class="btn btn-primary" id="claimRefBtn" disabled>Claim Reward</button>
-
     <div class="section-title">Your Referral Link</div>
     <div class="ref-link" id="refLink">Loading…</div>
     <button class="btn btn-primary" id="copyRefBtn" style="margin-top:10px;">Copy Link</button>
     <button class="btn btn-ghost" id="shareRefBtn" style="margin-top:10px;">Share via Telegram</button>
-
     <div class="section-title">Your Referrals (<span id="refCount">0</span>)</div>
     <div class="card" id="refListCard"><div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div></div>
   </section>
 
-  <!-- ===== Withdraw ===== -->
   <section class="view" id="view-withdraw">
     <div class="section-title">Convert BUX → GRAM</div>
-    <div class="card">
-      <div class="row"><span class="k">Available</span><span class="v mono" id="convertAvailable">0 BUX</span></div>
-    </div>
+    <div class="card"><div class="row"><span class="k">Available</span><span class="v mono" id="convertAvailable">0 BUX</span></div></div>
     <input class="input" id="convertAmount" placeholder="Amount (BUX)" dir="ltr" inputmode="numeric">
     <button class="btn btn-primary" id="convertBtn">Convert</button>
 
@@ -410,18 +273,14 @@ nav{
     <div class="section-title">Destination Wallet</div>
     <div class="card wallet-card">
       <div class="wallet-row" id="walletDisconnected">
-        <div class="wallet-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><circle cx="16.5" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg>
-        </div>
+        <div class="wallet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><circle cx="16.5" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg></div>
         <div class="wallet-copy">
           <div class="wallet-title">No wallet connected</div>
           <div class="wallet-sub">Connect your wallet to withdraw — no address to copy or paste.</div>
         </div>
       </div>
       <div class="wallet-row" id="walletConnected" style="display:none;">
-        <div class="wallet-icon connected">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-        </div>
+        <div class="wallet-icon connected"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
         <div class="wallet-copy">
           <div class="wallet-title mono" id="walletAddressShort">—</div>
           <div class="wallet-sub" id="walletAppName">Connected</div>
@@ -439,56 +298,46 @@ nav{
     <div class="card"><div class="empty" id="withdrawHistoryEmpty">No previous withdrawals.</div></div>
   </section>
 
-  <!-- ===== Admin — visible only to the admin account (username: gz_73) ===== -->
   <section class="view" id="view-admin">
     <div class="section-title">All Users (<span id="adminUserCount">0</span>)</div>
     <div class="card" id="adminUsersCard">
-      <div id="adminUsersList">
-        <div class="empty" id="adminUsersLoading">Loading users…</div>
-      </div>
+      <div id="adminUsersList"><div class="empty" id="adminUsersLoading">Loading users…</div></div>
     </div>
   </section>
 </main>
 
 <nav>
   <button class="tab active" data-view="view-home">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
-    <span>Home</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Home</span>
   </button>
   <button class="tab" data-view="view-tasks">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.4"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
-    <span>Tasks</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.4"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>Tasks</span>
   </button>
   <button class="tab" data-view="view-ref">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.2c2.2.5 3.8 2.2 3.8 5.8"/></svg>
-    <span>Referrals</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.2c2.2.5 3.8 2.2 3.8 5.8"/></svg><span>Referrals</span>
   </button>
   <button class="tab" data-view="view-withdraw">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><path d="M6 15h4"/></svg>
-    <span>Withdraw</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.2"/><path d="M2.5 10.5h19"/><path d="M6 15h4"/></svg><span>Withdraw</span>
   </button>
   <button class="tab" data-view="view-admin" id="adminTab" style="display:none;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></svg>
-    <span>Admin</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></svg><span>Admin</span>
   </button>
 </nav>
 
 <div class="toast" id="toast"></div>
 
 <script>
-/* =========================================================
-   1) General settings — edit these before deploying
-   ========================================================= */
+/* ========== 1) Settings ========== */
 const CONFIG = {
-  MONETAG_SHOW_FN: "show_11575327", // Rewarded Interstitial, zone 11575327
+  MONETAG_SHOW_FN: "show_11575327",
   DAILY_AD_LIMIT: 20,
   COIN_TICKER: "BUX",
   COIN_PER_AD: 10,
-  COINS_PER_GRAM: 6666.6667, // 10 BUX = 0.0015 GRAM  →  1 GRAM = 6666.6667 BUX
+  COINS_PER_GRAM: 6666.6667,
   MIN_WITHDRAW: 0.05,
   BACKEND_BASE_URL: "https://project-34m9.onrender.com",
   BOT_USERNAME: "Bbotfrubot",
-  ADMIN_USERNAME: "gz_73", // Telegram username (no @) allowed to see the Admin tab
+  ADMIN_USERNAME: "gz_73",
   FIREBASE_CONFIG: {
     apiKey: "AIzaSyAhRvNdTyX_S29wfjBdxQ1QR98XmNB_6WQ",
     authDomain: "wep-app-1771a.firebaseapp.com",
@@ -499,9 +348,24 @@ const CONFIG = {
   },
 };
 
-/* =========================================================
-   2) Telegram WebApp init
-   ========================================================= */
+/* مهمة forumok — تُعرض تلقائيًا حتى لو لم يرسلها السيرفر بعد.
+   إذا أرسل السيرفر مهمة بنفس الـ id تُستخدم نسخة السيرفر (مع حالة completed). */
+const LOCAL_TASKS = [
+  {
+    id: "forumok_register",
+    type: "website",
+    icon: "🌐",
+    title: "Register on forumok",
+    description: "Create an account on forumok.com",
+    reward: 500,
+    actionUrl: "https://forumok.com",
+    requiresProof: true,
+    proofPlaceholder: "Your forumok username",
+    completed: false,
+  },
+];
+
+/* ========== 2) Telegram ========== */
 const tg = window.Telegram?.WebApp;
 let tgUser = null;
 
@@ -513,26 +377,15 @@ function initTelegram() {
   tg.setBackgroundColor?.("#0a0d12");
   tgUser = tg.initDataUnsafe?.user || null;
   if (tgUser) {
-    document.getElementById("avatarInitial").textContent =
-      (tgUser.first_name || "U").trim().charAt(0).toUpperCase();
-
-    // Show the logged-in user's name/username in the header instead of the app name
-    const displayName = tgUser.username
-      ? "@" + tgUser.username
+    document.getElementById("avatarInitial").textContent = (tgUser.first_name || "U").trim().charAt(0).toUpperCase();
+    const displayName = tgUser.username ? "@" + tgUser.username
       : [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") || "User";
     const brandNameEl = document.getElementById("brandName");
     if (brandNameEl) brandNameEl.textContent = displayName;
-
-    // Show the user's Telegram profile photo in the header mark, if available
     if (tgUser.photo_url) {
-      const brandLogoImg = document.getElementById("brandLogoImg");
-      if (brandLogoImg) {
-        brandLogoImg.src = tgUser.photo_url;
-        brandLogoImg.alt = displayName;
-      }
+      const img = document.getElementById("brandLogoImg");
+      if (img) { img.src = tgUser.photo_url; img.alt = displayName; }
     }
-
-    // Reveal the Admin tab only for the configured admin username
     if ((tgUser.username || "").toLowerCase() === CONFIG.ADMIN_USERNAME.toLowerCase()) {
       const adminTab = document.getElementById("adminTab");
       if (adminTab) adminTab.style.display = "flex";
@@ -540,21 +393,13 @@ function initTelegram() {
   }
 }
 
-/* =========================================================
-   3) Firebase init + server-side auth
-   ⚠️ initData is not verified here. The server (Render) computes
-   the HMAC using the bot token and returns a trusted result. This
-   code only sends initData and receives the login state.
-   ========================================================= */
+/* ========== 3) Firebase + bootstrap ========== */
 let db = null;
 function initFirebase() {
   firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
   db = firebase.firestore();
 }
 
-// دمج auth/verify + tasks/list + referrals/list في طلب واحد
-// (/api/bootstrap) بدل 3 رحلات شبكة منفصلة عند فتح التطبيق —
-// هذا يقلل زمن التحميل الفعلي بشكل ملموس.
 async function bootstrapSession() {
   const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/bootstrap`, {
     method: "POST",
@@ -563,7 +408,6 @@ async function bootstrapSession() {
   });
   if (!res.ok) throw new Error("bootstrap failed");
   const data = await res.json();
-
   if (data.user) {
     state.coins = data.user.coins || 0;
     state.balance = data.user.balance || 0;
@@ -571,19 +415,12 @@ async function bootstrapSession() {
     state.totalViews = data.user.totalViews || 0;
     renderBalance();
   }
-  if (data.tasks) {
-    tasksCache = data.tasks;
-    renderTasks();
-  }
-  if (data.referralsData) {
-    renderReferrals(data.referralsData);
-  }
+  if (data.tasks) { tasksCache = data.tasks; renderTasks(); }
+  if (data.referralsData) renderReferrals(data.referralsData);
   return data;
 }
 
-/* =========================================================
-   4) Splash / Loading — real preparation steps, no artificial delay
-   ========================================================= */
+/* ========== 4) Splash ========== */
 async function runSplashSequence() {
   const fill = document.getElementById("splashBarFill");
   const status = document.getElementById("splashStatus");
@@ -591,32 +428,20 @@ async function runSplashSequence() {
     { pct: 20, label: "Loading Telegram interface…", fn: initTelegram },
     { pct: 45, label: "Connecting to Firebase…", fn: initFirebase },
     { pct: 100, label: "Loading your data…", fn: async () => {
-        try {
-          // نداء واحد فقط للسيرفر يجلب user + tasks + referrals معًا
-          await bootstrapSession();
-        } catch (e) {
-          console.warn("bootstrap skipped (backend not configured yet)", e);
-        }
-        // نفتح مستمع Firestore الحيّ بدون انتظاره — البيانات
-        // الحالية وصلت أصلاً من bootstrapSession، وهذا فقط
-        // لتحديثات لاحقة (بعد مشاهدة إعلان مثلاً)
+        try { await bootstrapSession(); }
+        catch (e) { console.warn("bootstrap skipped (backend not configured yet)", e); renderTasks(); }
         listenToUserDoc();
-      }
-    },
+    }},
   ];
-
   for (const step of steps) {
     status.textContent = step.label;
     await step.fn();
     fill.style.width = step.pct + "%";
   }
-
   document.getElementById("splash").classList.add("hidden");
 }
 
-/* =========================================================
-   5) Tabs
-   ========================================================= */
+/* ========== 5) Tabs ========== */
 document.querySelectorAll(".tab").forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -627,16 +452,12 @@ document.querySelectorAll(".tab").forEach(tab => {
     tg?.HapticFeedback?.selectionChanged();
   });
 });
-
-/* Unified light click sound for all buttons (.btn) without duplicating code per handler */
 document.addEventListener("click", (e) => {
   const btn = e.target.closest(".btn");
   if (btn && !btn.disabled) playClickSound();
 });
 
-/* =========================================================
-   6) Toast
-   ========================================================= */
+/* ========== 6) Toast ========== */
 function showToast(msg) {
   const el = document.getElementById("toast");
   el.textContent = msg;
@@ -645,53 +466,27 @@ function showToast(msg) {
   showToast._t = setTimeout(() => el.classList.remove("show"), 2200);
 }
 
-/* =========================================================
-   6b) Sounds — generated programmatically via Web Audio API (no external files)
-   ========================================================= */
+/* ========== 6b) Sounds ========== */
 let audioCtx = null;
 function getAudioCtx() {
-  if (!audioCtx) {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (Ctx) audioCtx = new Ctx();
-  }
+  if (!audioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) audioCtx = new Ctx(); }
   return audioCtx;
 }
 function playTone(freq, startTime, duration, gainPeak = 0.18, type = "sine") {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
+  const ctx = getAudioCtx(); if (!ctx) return;
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.type = type; osc.frequency.value = freq;
   gain.gain.setValueAtTime(0, startTime);
   gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
   osc.connect(gain).connect(ctx.destination);
-  osc.start(startTime);
-  osc.stop(startTime + duration + 0.02);
+  osc.start(startTime); osc.stop(startTime + duration + 0.02);
 }
-function playCoinSound() {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  playTone(880, now, 0.12, 0.16);
-  playTone(1318.5, now + 0.06, 0.16, 0.14);
-}
-function playClaimSound() {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  [659.25, 830.6, 987.77, 1318.5].forEach((f, i) => playTone(f, now + i * 0.07, 0.18, 0.13));
-}
-function playClickSound() {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  playTone(520, ctx.currentTime, 0.045, 0.07, "triangle");
-}
+function playCoinSound() { const c = getAudioCtx(); if (!c) return; const n = c.currentTime; playTone(880, n, 0.12, 0.16); playTone(1318.5, n + 0.06, 0.16, 0.14); }
+function playClaimSound() { const c = getAudioCtx(); if (!c) return; const n = c.currentTime; [659.25, 830.6, 987.77, 1318.5].forEach((f, i) => playTone(f, n + i * 0.07, 0.18, 0.13)); }
+function playClickSound() { const c = getAudioCtx(); if (!c) return; playTone(520, c.currentTime, 0.045, 0.07, "triangle"); }
 
-/* =========================================================
-   7) App state — populated later from Firestore via the server
-   ========================================================= */
+/* ========== 7) State ========== */
 let state = { coins: 0, balance: 0, viewsToday: 0, totalViews: 0 };
 
 function renderBalance() {
@@ -709,95 +504,54 @@ function renderBalance() {
   document.getElementById("orbBtn").disabled = left <= 0;
 }
 
-/* =========================================================
-   8) Listen for balance updates from Firestore (after the server verifies initData)
-   Returns a promise that resolves once the FIRST snapshot arrives,
-   so the splash screen can wait for real data before revealing the
-   app — this avoids the "0 → real balance" flash on Home.
-   A safety timeout prevents the splash from hanging forever if
-   Firestore is slow/offline.
-   ========================================================= */
+/* ========== 8) Firestore listener ========== */
 function listenToUserDoc() {
   return new Promise((resolve) => {
     if (!db || !tgUser) { resolve(); return; }
     let settled = false;
     const settle = () => { if (!settled) { settled = true; resolve(); } };
-
-    db.collection("users").doc(String(tgUser.id))
-      .onSnapshot(doc => {
-        if (doc.exists) {
-          const d = doc.data();
-          state.coins = d.coins || 0;
-          state.balance = d.balance || 0;
-          state.viewsToday = d.viewsToday || 0;
-          state.totalViews = d.totalViews || 0;
-          renderBalance();
-        }
-        settle();
-      }, err => {
-        console.warn("Firestore listen error", err);
-        settle();
-      });
-
-    setTimeout(settle, 4000); // don't block app startup indefinitely
+    db.collection("users").doc(String(tgUser.id)).onSnapshot(doc => {
+      if (doc.exists) {
+        const d = doc.data();
+        state.coins = d.coins || 0;
+        state.balance = d.balance || 0;
+        state.viewsToday = d.viewsToday || 0;
+        state.totalViews = d.totalViews || 0;
+        renderBalance();
+      }
+      settle();
+    }, err => { console.warn("Firestore listen error", err); settle(); });
+    setTimeout(settle, 4000);
   });
 }
 
-/* =========================================================
-   9) Ads — Monetag only
-   ========================================================= */
-function initAds() {
-  // Nothing to init — the Monetag SDK tag in <head> handles setup itself.
-  // Kept as a no-op so the call site (DOMContentLoaded) doesn't need to change.
-}
+/* ========== 9) Ads (Monetag) ========== */
+function initAds() {}
 
-// Monetag injects window[MONETAG_SHOW_FN] asynchronously after its <script>
-// tag loads. On a slow connection the button can be tapped before that
-// function exists yet, so we wait briefly for it instead of failing instantly.
 function waitForMonetag(timeoutMs = 8000, intervalMs = 150) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     (function check() {
       const fn = window[CONFIG.MONETAG_SHOW_FN];
       if (typeof fn === "function") return resolve(fn);
-      if (Date.now() - start >= timeoutMs) {
-        return reject(new Error("Monetag SDK failed to load"));
-      }
+      if (Date.now() - start >= timeoutMs) return reject(new Error("Monetag SDK failed to load"));
       setTimeout(check, intervalMs);
     })();
   });
 }
-
 function makeYmid() {
-  // Unique id per ad attempt. Sent to Monetag (appears in their S2S postback)
-  // AND to our own backend, so the two can be matched up — this is what
-  // lets the server tell a *real, paid* ad view apart from a bare fetch()
-  // call someone fires from devtools without ever seeing an ad.
   return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 }
-
-// Shows one Rewarded Interstitial and returns { ymid, elapsedMs }.
-// Rejects if the SDK errors out OR if the ad closes suspiciously fast
-// (a genuine interstitial takes several seconds to render and be watched;
-// a near-instant resolve is a strong signal of a stub/fallback/no-fill event).
 async function showRewardedAd() {
   const monetagShow = await waitForMonetag();
   const ymid = makeYmid();
   const startedAt = Date.now();
-
-  // Preload first, then show — this is Monetag's own recommended pattern
-  // and avoids ads that "resolve" instantly because nothing had loaded yet.
   await monetagShow({ type: "preload", ymid });
   await monetagShow({ ymid });
-
   const elapsedMs = Date.now() - startedAt;
-  const MIN_PLAUSIBLE_MS = 3000; // a real interstitial can't be watched+closed faster than this
-  if (elapsedMs < MIN_PLAUSIBLE_MS) {
-    throw new Error("Ad closed too quickly to be a genuine view");
-  }
+  if (elapsedMs < 3000) throw new Error("Ad closed too quickly to be a genuine view");
   return { ymid, elapsedMs };
 }
-
 function burstCoins() {
   const wrap = document.getElementById("burst");
   for (let i = 0; i < 10; i++) {
@@ -813,14 +567,6 @@ function burstCoins() {
     setTimeout(() => s.remove(), 650);
   }
 }
-
-// IMPORTANT: this call only tells the backend "the SDK promise resolved for
-// this ymid". It must NOT be the thing that credits BUX. The backend has to
-// treat this as a pending/unconfirmed claim and only actually credit the
-// balance once Monetag's own server-to-server postback arrives for the same
-// ymid with reward_event_type=valued. See the note below the code for the
-// exact postback setup — without it, this endpoint alone can still be
-// called directly (Postman/devtools) to farm free rewards.
 async function confirmAdViewOnServer(ymid) {
   const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/ads/confirm`, {
     method: "POST",
@@ -830,7 +576,6 @@ async function confirmAdViewOnServer(ymid) {
   if (!res.ok) throw new Error("ad confirmation failed");
   return res.json();
 }
-
 document.getElementById("orbBtn").addEventListener("click", async () => {
   if (state.viewsToday >= CONFIG.DAILY_AD_LIMIT) { showToast("You've reached today's limit"); return; }
   const btn = document.getElementById("orbBtn");
@@ -839,61 +584,42 @@ document.getElementById("orbBtn").addEventListener("click", async () => {
     const { ymid } = await showRewardedAd();
     const data = await confirmAdViewOnServer(ymid);
     if (data?.pending) {
-      // Backend is waiting on Monetag's postback before crediting — don't
-      // celebrate yet, just tell the user honestly.
       showToast("Ad watched — reward will appear shortly");
     } else {
-      burstCoins();
-      playCoinSound();
+      burstCoins(); playCoinSound();
       tg?.HapticFeedback?.notificationOccurred("success");
     }
   } catch (e) {
     console.warn("Ad flow error", e);
-    if (String(e?.message).includes("Monetag SDK failed to load")) {
-      showToast("Ads aren't ready yet, try again in a moment");
-    } else if (String(e?.message).includes("too quickly")) {
-      showToast("Ad view could not be verified, try again");
-    } else {
-      showToast("Ad view was not completed");
-    }
+    if (String(e?.message).includes("Monetag SDK failed to load")) showToast("Ads aren't ready yet, try again in a moment");
+    else if (String(e?.message).includes("too quickly")) showToast("Ad view could not be verified, try again");
+    else showToast("Ad view was not completed");
   } finally {
     btn.disabled = state.viewsToday >= CONFIG.DAILY_AD_LIMIT;
   }
 });
 
-/* =========================================================
-   10) Referrals — connected to the server/Firestore
-   ========================================================= */
+/* ========== 10) Referrals ========== */
 let currentReferralLink = "";
 function renderReferrals(data) {
   currentReferralLink = data.referralLink || "";
-  document.getElementById("refLink").textContent = currentReferralLink
-    ? currentReferralLink.replace("https://", "")
-    : "Not available yet";
+  document.getElementById("refLink").textContent = currentReferralLink ? currentReferralLink.replace("https://", "") : "Not available yet";
   document.getElementById("refCount").textContent = data.referralCount || 0;
   document.getElementById("refRewardRate").textContent = Math.floor(data.rewardPerReferral) + " " + CONFIG.COIN_TICKER;
   document.getElementById("refUnclaimed").textContent = Math.floor(data.unclaimedReward).toLocaleString() + " " + CONFIG.COIN_TICKER;
   document.getElementById("claimRefBtn").disabled = !(data.unclaimedReward > 0);
-
   const listCard = document.getElementById("refListCard");
   if (!data.referrals || data.referrals.length === 0) {
     listCard.innerHTML = '<div class="empty" id="refEmpty">No friends invited yet. Share your link to start earning.</div>';
   } else {
     listCard.innerHTML = data.referrals.map(r => {
-      const label = r.username ? "@" + r.username : (r.name || "User");
+      const label = escapeHtml(r.username ? "@" + r.username : (r.name || "User"));
       const statusClass = r.rewardClaimed ? "claimed" : (r.status === "active" ? "active" : "pending");
       const statusText = r.rewardClaimed ? "Claimed" : (r.status === "active" ? "Active" : "Pending");
-      return `
-        <div class="friend-row">
-          <span class="friend-name">${label}</span>
-          <span class="friend-status ${statusClass}">${statusText}</span>
-        </div>`;
+      return `<div class="friend-row"><span class="friend-name">${label}</span><span class="friend-status ${statusClass}">${statusText}</span></div>`;
     }).join("");
   }
 }
-
-// يُستخدم فقط لإعادة التحميل عند فتح تبويب Friends أو بعد Claim —
-// التحميل الأولي عند فتح التطبيق يأتي من bootstrapSession()
 async function loadReferrals() {
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/list`, {
@@ -902,23 +628,17 @@ async function loadReferrals() {
       body: JSON.stringify({}),
     });
     if (!res.ok) throw new Error("failed to load referrals");
-    const data = await res.json();
-    renderReferrals(data);
-  } catch (e) {
-    console.warn("loadReferrals error", e);
-  }
+    renderReferrals(await res.json());
+  } catch (e) { console.warn("loadReferrals error", e); }
 }
-
 document.getElementById("copyRefBtn").addEventListener("click", () => {
   if (!currentReferralLink) { showToast("Link not ready yet"); return; }
   navigator.clipboard?.writeText(currentReferralLink).then(() => showToast("Link copied"));
 });
-
 document.getElementById("shareRefBtn").addEventListener("click", () => {
   if (!currentReferralLink) { showToast("Link not ready yet"); return; }
   tg?.openTelegramLink?.(`https://t.me/share/url?url=${encodeURIComponent(currentReferralLink)}`);
 });
-
 document.getElementById("claimRefBtn").addEventListener("click", async () => {
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/referrals/claim`, {
@@ -934,70 +654,98 @@ document.getElementById("claimRefBtn").addEventListener("click", async () => {
       state.coins += data.amount;
       renderBalance();
       loadReferrals();
-    } else {
-      showToast("No rewards available right now");
-    }
-  } catch (e) {
-    console.warn(e);
-    showToast("Could not claim reward");
-  }
+    } else showToast("No rewards available right now");
+  } catch (e) { console.warn(e); showToast("Could not claim reward"); }
 });
-
 document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", loadReferrals);
 
-/* =========================================================
-   11) Tasks — data-driven list fetched from the server, so new
-   tasks can be added later purely on the backend with no
-   front-end changes needed. Each task has a type that decides
-   how it's verified (currently: "telegram_channel").
-   ========================================================= */
+/* ========== 11) Tasks ========== */
 let tasksCache = [];
 
-function taskIconMarkup(task) {
-  if (task.icon) return task.icon; // e.g. an emoji provided by the server
-  return "🎯";
+/* فتح الرابط في تطبيق Chrome خارج تيليجرام (بدون WebView داخلي):
+   1) Telegram.WebApp.openLink مع try_browser:"chrome" (الأفضل، تيليجرام 7.x+)
+   2) Android: intent:// يستهدف حزمة Chrome مباشرة
+   3) iOS: googlechromes://
+   4) احتياطي: window.open */
+function openInChrome(url) {
+  const ua = navigator.userAgent || "";
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  try {
+    if (tg?.openLink) {
+      tg.openLink(url, { try_browser: "chrome", try_instant_view: false });
+      return;
+    }
+  } catch (e) { console.warn("openLink failed", e); }
+  try {
+    const u = new URL(url);
+    if (isAndroid) {
+      window.location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(":", "")};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+      return;
+    }
+    if (isIOS) {
+      window.location.href = (u.protocol === "https:" ? "googlechromes://" : "googlechrome://") + u.host + u.pathname + u.search;
+      return;
+    }
+  } catch (e) { console.warn(e); }
+  window.open(url, "_blank");
+}
+
+function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function taskIconMarkup(task) { return task.icon ? escapeHtml(task.icon) : "🎯"; }
+
+const ICON_EXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+
+// دمج مهام السيرفر مع المهام المحلية (السيرفر له الأولوية)
+function getAllTasks() {
+  const ids = new Set(tasksCache.map(t => t.id));
+  return [...tasksCache, ...LOCAL_TASKS.filter(t => !ids.has(t.id))];
 }
 
 function renderTasks() {
   const list = document.getElementById("tasksList");
-  if (!tasksCache.length) {
+  const tasks = getAllTasks();
+  if (!tasks.length) {
     list.innerHTML = '<div class="empty">No tasks available right now — check back soon.</div>';
     return;
   }
-
-  list.innerHTML = tasksCache.map((task) => {
+  list.innerHTML = tasks.map((task) => {
+    const isWebsite = task.type === "website";
     const rewardStr = Math.floor(task.reward).toLocaleString();
+    const head = `
+      <div class="task-row">
+        <div class="task-icon">${taskIconMarkup(task)}</div>
+        <div class="task-copy">
+          <div class="task-title">${escapeHtml(task.title)}</div>
+          <div class="task-sub">${escapeHtml(task.description)}</div>
+          ${isWebsite ? `<div class="task-tag">${ICON_EXT} Opens in Chrome</div>` : ""}
+        </div>
+        <div class="task-reward">+${rewardStr}<span>BUX</span></div>
+      </div>`;
     if (task.completed) {
       return `
-        <div class="task-card completed" data-task-id="${task.id}">
-          <div class="task-row">
-            <div class="task-icon">${taskIconMarkup(task)}</div>
-            <div class="task-copy">
-              <div class="task-title">${task.title}</div>
-              <div class="task-sub">${task.description}</div>
-            </div>
-            <div class="task-reward">+${rewardStr}<span>BUX</span></div>
-          </div>
+        <div class="task-card ${isWebsite ? "website " : ""}completed" data-task-id="${escapeHtml(task.id)}">
+          ${head}
           <div class="task-done">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
             Completed
           </div>
         </div>`;
     }
+    const openLabel = isWebsite ? "Open in Chrome" : "Join Channel";
+    const proof = task.requiresProof
+      ? `<div class="task-proof"><input class="input task-proof-input" dir="ltr" placeholder="${escapeHtml(task.proofPlaceholder || "Your username")}" autocomplete="off"></div>`
+      : "";
     return `
-      <div class="task-card" data-task-id="${task.id}">
-        <div class="task-row">
-          <div class="task-icon">${taskIconMarkup(task)}</div>
-          <div class="task-copy">
-            <div class="task-title">${task.title}</div>
-            <div class="task-sub">${task.description}</div>
-          </div>
-          <div class="task-reward">+${rewardStr}<span>BUX</span></div>
-        </div>
+      <div class="task-card ${isWebsite ? "website" : ""}" data-task-id="${escapeHtml(task.id)}" data-type="${escapeHtml(task.type || "telegram_channel")}">
+        ${head}
         <div class="task-actions">
-          <button class="btn btn-primary task-open-btn" data-url="${task.actionUrl}">Join Channel</button>
+          <button class="btn btn-primary task-open-btn" data-url="${escapeHtml(task.actionUrl || "")}">${isWebsite ? ICON_EXT : ""}${openLabel}</button>
           <button class="btn btn-ghost task-verify-btn" style="display:none;">Verify</button>
         </div>
+        ${proof}
       </div>`;
   }).join("");
 }
@@ -1015,24 +763,25 @@ async function loadTasks() {
     renderTasks();
   } catch (e) {
     console.warn("loadTasks error", e);
-    document.getElementById("tasksList").innerHTML = '<div class="empty">Could not load tasks. Pull to refresh and try again.</div>';
+    renderTasks(); // يعرض المهام المحلية على الأقل
   }
 }
 
-// Event delegation: works for every task card, including ones added later
 document.getElementById("tasksList").addEventListener("click", async (e) => {
   const openBtn = e.target.closest(".task-open-btn");
   const verifyBtn = e.target.closest(".task-verify-btn");
 
   if (openBtn) {
     const url = openBtn.dataset.url;
+    const card = openBtn.closest(".task-card");
     if (url) {
       if (url.startsWith("https://t.me/")) tg?.openTelegramLink?.(url);
-      else tg?.openLink?.(url) ?? window.open(url, "_blank");
+      else openInChrome(url);
     }
     openBtn.style.display = "none";
-    const verifyEl = openBtn.parentElement.querySelector(".task-verify-btn");
+    const verifyEl = card.querySelector(".task-verify-btn");
     if (verifyEl) verifyEl.style.display = "flex";
+    card.querySelector(".task-proof")?.classList.add("show");
     return;
   }
 
@@ -1040,17 +789,26 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
     const card = verifyBtn.closest(".task-card");
     const taskId = card?.dataset.taskId;
     if (!taskId) return;
+    const proofInput = card.querySelector(".task-proof-input");
+    const proof = proofInput ? proofInput.value.trim() : undefined;
+    if (proofInput && proof.length < 2) { showToast("Enter your username first"); return; }
+
     verifyBtn.disabled = true;
     verifyBtn.textContent = "Verifying…";
     try {
       const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
-        body: JSON.stringify({ taskId }),
+        body: JSON.stringify({ taskId, proof }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "verification failed");
 
+      if (data.pending) {
+        showToast("Submitted — pending review");
+        verifyBtn.textContent = "Pending review";
+        return;
+      }
       if (data.verified) {
         showToast(data.alreadyClaimed ? "Task already completed" : `Task complete! +${data.reward ?? ""} BUX`.trim());
         if (!data.alreadyClaimed) {
@@ -1061,31 +819,21 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
         }
         await loadTasks();
       } else {
-        showToast("You haven't joined the channel yet");
+        showToast("Task not completed yet");
         verifyBtn.disabled = false;
         verifyBtn.textContent = "Verify";
       }
-    } catch (e) {
-      console.warn(e);
+    } catch (err) {
+      console.warn(err);
       showToast("Could not verify right now, try again");
       verifyBtn.disabled = false;
       verifyBtn.textContent = "Verify";
     }
   }
 });
-
 document.querySelector('.tab[data-view="view-tasks"]').addEventListener("click", loadTasks);
 
-/* =========================================================
-   11b) Admin — all users list (only reachable if the Admin tab
-   is visible, which only happens for CONFIG.ADMIN_USERNAME).
-   The backend independently re-checks the username from the
-   verified initData, so this is enforced server-side too.
-   ========================================================= */
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
+/* ========== 11b) Admin ========== */
 async function loadAdminUsers() {
   const list = document.getElementById("adminUsersList");
   list.innerHTML = `<div class="empty" id="adminUsersLoading">Loading users…</div>`;
@@ -1096,14 +844,8 @@ async function loadAdminUsers() {
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "failed to load users");
-
     document.getElementById("adminUserCount").textContent = data.count;
-
-    if (!data.users.length) {
-      list.innerHTML = `<div class="empty">No users yet.</div>`;
-      return;
-    }
-
+    if (!data.users.length) { list.innerHTML = `<div class="empty">No users yet.</div>`; return; }
     list.innerHTML = data.users.map((u) => {
       const displayHandle = u.username ? "@" + u.username : "no username";
       const initial = (u.firstName || u.username || "U").trim().charAt(0).toUpperCase();
@@ -1122,28 +864,14 @@ async function loadAdminUsers() {
           </div>
         </div>`;
     }).join("");
-  } catch (e) {
-    console.warn(e);
-    list.innerHTML = `<div class="empty">Could not load users.</div>`;
-  }
+  } catch (e) { console.warn(e); list.innerHTML = `<div class="empty">Could not load users.</div>`; }
 }
-
 document.getElementById("adminTab").addEventListener("click", loadAdminUsers);
 
-/* =========================================================
-   12) TON Connect — wallet connection for withdrawals
-   Replaces manual address paste with a native wallet connect
-   flow (Tonkeeper, MyTonWallet, etc). The connected wallet's
-   address is used automatically when requesting a withdrawal.
-   ========================================================= */
+/* ========== 12) TON Connect ========== */
 let tonConnectUI = null;
-let connectedWalletAddress = null; // user-friendly (UQ.../EQ...) format
-
-function shortenAddress(addr) {
-  if (!addr) return "—";
-  return addr.slice(0, 6) + "…" + addr.slice(-6);
-}
-
+let connectedWalletAddress = null;
+function shortenAddress(addr) { return addr ? addr.slice(0, 6) + "…" + addr.slice(-6) : "—"; }
 function renderWalletConnected(wallet) {
   document.getElementById("walletDisconnected").style.display = "none";
   document.getElementById("walletConnected").style.display = "flex";
@@ -1153,7 +881,6 @@ function renderWalletConnected(wallet) {
   document.getElementById("disconnectWalletBtn").style.display = "flex";
   document.getElementById("withdrawBtn").disabled = false;
 }
-
 function renderWalletDisconnected() {
   document.getElementById("walletDisconnected").style.display = "flex";
   document.getElementById("walletConnected").style.display = "none";
@@ -1161,45 +888,32 @@ function renderWalletDisconnected() {
   document.getElementById("disconnectWalletBtn").style.display = "none";
   document.getElementById("withdrawBtn").disabled = true;
 }
-
 function initTonConnect() {
-  if (!window.TON_CONNECT_UI) {
-    console.warn("TonConnect UI script failed to load");
-    return;
-  }
+  if (!window.TON_CONNECT_UI) { console.warn("TonConnect UI script failed to load"); return; }
   const manifestUrl = new URL("tonconnect-manifest.json", window.location.href).toString();
   tonConnectUI = new TON_CONNECT_UI.TonConnectUI({ manifestUrl });
-
   tonConnectUI.onStatusChange((wallet) => {
     if (wallet) {
       connectedWalletAddress = TON_CONNECT_UI.toUserFriendlyAddress(wallet.account.address);
       renderWalletConnected(wallet);
-    } else {
-      connectedWalletAddress = null;
-      renderWalletDisconnected();
-    }
+    } else { connectedWalletAddress = null; renderWalletDisconnected(); }
   });
 }
-
 document.getElementById("connectWalletBtn").addEventListener("click", () => {
   if (!tonConnectUI) { showToast("Wallet connect is unavailable right now"); return; }
   tonConnectUI.openModal();
 });
-
 document.getElementById("disconnectWalletBtn").addEventListener("click", async () => {
   if (!tonConnectUI) return;
   await tonConnectUI.disconnect();
   showToast("Wallet disconnected");
 });
 
-/* =========================================================
-   12b) Convert — BUX to GRAM, only place GRAM is touched client-side
-   ========================================================= */
+/* ========== 12b) Convert ========== */
 document.getElementById("convertBtn").addEventListener("click", async () => {
   const amount = Math.floor(parseFloat(document.getElementById("convertAmount").value));
   if (!amount || amount <= 0) { showToast("Enter a valid BUX amount"); return; }
   if (amount > state.coins) { showToast("Insufficient BUX balance"); return; }
-
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/convert`, {
       method: "POST",
@@ -1208,7 +922,6 @@ document.getElementById("convertBtn").addEventListener("click", async () => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "conversion failed");
-
     state.coins -= data.converted;
     state.balance += data.gram;
     renderBalance();
@@ -1216,22 +929,16 @@ document.getElementById("convertBtn").addEventListener("click", async () => {
     showToast(`Converted ${data.converted} BUX → ${data.gram.toFixed(4)} GRAM`);
     playClaimSound();
     tg?.HapticFeedback?.notificationOccurred("success");
-  } catch (e) {
-    console.warn(e);
-    showToast("Could not convert right now");
-  }
+  } catch (e) { console.warn(e); showToast("Could not convert right now"); }
 });
 
-/* =========================================================
-   13) Withdraw — the client never signs a transaction, it only sends a request to the server
-   ========================================================= */
+/* ========== 13) Withdraw ========== */
 document.getElementById("withdrawBtn").addEventListener("click", async () => {
   const wallet = connectedWalletAddress;
   const amount = parseFloat(document.getElementById("withdrawAmount").value);
   if (!wallet) { showToast("Connect your wallet first"); return; }
   if (!amount || amount < CONFIG.MIN_WITHDRAW) { showToast(`Minimum withdrawal is ${CONFIG.MIN_WITHDRAW} GRAM`); return; }
   if (amount > state.balance) { showToast("Insufficient balance"); return; }
-
   try {
     const res = await fetch(`${CONFIG.BACKEND_BASE_URL}/api/withdraw/request`, {
       method: "POST",
@@ -1240,41 +947,18 @@ document.getElementById("withdrawBtn").addEventListener("click", async () => {
     });
     if (!res.ok) throw new Error("withdraw request failed");
     showToast("Withdrawal request sent for review");
-  } catch (e) {
-    console.warn(e);
-    showToast("Could not send request, try again later");
-  }
+  } catch (e) { console.warn(e); showToast("Could not send request, try again later"); }
 });
 
-/* =========================================================
-   14) Disable copy / long-press context menu / text selection
-   Applies everywhere except inputs & textareas (wallet address,
-   withdraw amount) which must stay copy/paste-able.
-   ========================================================= */
-function isEditableTarget(el) {
-  return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
-}
-document.addEventListener("contextmenu", (e) => {
-  if (!isEditableTarget(e.target)) e.preventDefault();
-});
-document.addEventListener("selectstart", (e) => {
-  if (!isEditableTarget(e.target)) e.preventDefault();
-});
-document.addEventListener("copy", (e) => {
-  if (!isEditableTarget(e.target)) e.preventDefault();
-});
-document.addEventListener("cut", (e) => {
-  if (!isEditableTarget(e.target)) e.preventDefault();
-});
-document.addEventListener("dragstart", (e) => {
-  if (!isEditableTarget(e.target)) e.preventDefault();
-});
+/* ========== 14) Disable copy / context menu ========== */
+function isEditableTarget(el) { return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA"); }
+["contextmenu", "selectstart", "copy", "cut", "dragstart"].forEach(ev =>
+  document.addEventListener(ev, (e) => { if (!isEditableTarget(e.target)) e.preventDefault(); })
+);
 
-/* =========================================================
-   15) Entry point
-   ========================================================= */
+/* ========== 15) Entry point ========== */
 window.addEventListener("DOMContentLoaded", async () => {
-  await runSplashSequence(); // bootstrapSession() inside already loaded user + tasks + referrals in one request
+  await runSplashSequence();
   initAds();
   initTonConnect();
   renderBalance();

